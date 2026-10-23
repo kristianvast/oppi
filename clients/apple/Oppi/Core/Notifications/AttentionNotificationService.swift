@@ -207,6 +207,7 @@ final class AttentionNotificationService: NSObject, UNUserNotificationCenterDele
     ///   no caller can forget the scoped lock.
     func notifyAskIfNeeded(
         _ ask: AskRequest,
+        sessionName: String?,
         activeSessionId: String?,
         hidesQuestionText: @escaping @MainActor () -> Bool
     ) {
@@ -227,6 +228,7 @@ final class AttentionNotificationService: NSObject, UNUserNotificationCenterDele
         schedule(identifier: AttentionNotificationPolicy.askRequestIdentifier(sessionId: ask.sessionId)) { [self] in
             let payload = AttentionNotificationPolicy.askPayload(
                 for: ask,
+                sessionName: sessionName,
                 revealsQuestionText: !(_appLockEnabledForTesting ?? AppLockService.shared.isEnabled)
                     && !hidesQuestionText()
             )
@@ -247,20 +249,28 @@ final class AttentionNotificationService: NSObject, UNUserNotificationCenterDele
     /// Post the `done` banner the server skipped: a device holding a live stream gets no
     /// push, and agent keep-alive holds the stream open while the app is in the background.
     /// Only while the app is not active, like the push it replaces.
+    /// No banner for a session with neither a name nor a last message: it could not say what
+    /// it is about.
     /// - Parameter hidesSessionName: true when a scoped lock covers the session; read when
     ///   the request is added.
     func notifySessionDoneIfNeeded(
         sessionId: String,
         sessionName: String?,
+        lastMessage: String?,
         hidesSessionName: @escaping @MainActor () -> Bool
     ) {
         let appState = _applicationStateForTesting ?? UIApplication.shared.applicationState
         guard appState != .active else { return }
+        guard !AttentionNotificationPolicy.sessionDoneIsAnonymous(
+            sessionName: sessionName,
+            lastMessage: lastMessage
+        ) else { return }
 
         schedule(identifier: AttentionNotificationPolicy.sessionDoneRequestIdentifier(sessionId: sessionId)) { [self] in
             let payload = AttentionNotificationPolicy.sessionDonePayload(
                 sessionId: sessionId,
                 sessionName: sessionName,
+                lastMessage: lastMessage,
                 revealsSessionName: !(_appLockEnabledForTesting ?? AppLockService.shared.isEnabled)
                     && !hidesSessionName()
             )

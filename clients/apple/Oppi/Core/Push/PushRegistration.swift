@@ -27,11 +27,14 @@ final class PushRegistration {
     static let keyRotationInterval: TimeInterval = 30 * 86_400
 
     private var deviceToken: String?
+    private var lastDeviceTokenError: String?
     private var tokenWaiters: [CheckedContinuation<String?, Never>] = []
 
     #if DEBUG
     /// Replaces the registration a server's push capability starts.
     var _onRegisterForTesting: ((String?) -> Void)?
+    /// Overrides the shared turn-on registration path for deterministic tests.
+    var _turnOnForTesting: ((String) async -> Result<Void, PushTurnOnError>)?
     #endif
 
     private init() {}
@@ -46,6 +49,12 @@ final class PushRegistration {
         "\(AppIdentifiers.subsystem).push.permission.\(serverId)"
     }
 
+    private static func promptDismissedKey(serverId: String) -> String {
+        "\(AppIdentifiers.subsystem).push.promptDismissed.\(serverId)"
+    }
+
+    static let stateDidChangeNotification = Notification.Name("oppi.push.registrationStateDidChange")
+
     /// The user turned on push for this server. Off by default.
     static func isEnabled(serverId: String, defaults: UserDefaults = .standard) -> Bool {
         defaults.bool(forKey: optInKey(serverId: serverId))
@@ -53,6 +62,37 @@ final class PushRegistration {
 
     static func setEnabled(_ enabled: Bool, serverId: String, defaults: UserDefaults = .standard) {
         defaults.set(enabled, forKey: optInKey(serverId: serverId))
+        NotificationCenter.default.post(name: stateDidChangeNotification, object: serverId)
+    }
+
+    /// Whether the user dismissed the session-list push prompt card for this server.
+    static func isPromptDismissed(serverId: String, defaults: UserDefaults = .standard) -> Bool {
+        defaults.bool(forKey: promptDismissedKey(serverId: serverId))
+    }
+
+    static func setPromptDismissed(_ dismissed: Bool, serverId: String, defaults: UserDefaults = .standard) {
+        if dismissed {
+            defaults.set(true, forKey: promptDismissedKey(serverId: serverId))
+        } else {
+            defaults.removeObject(forKey: promptDismissedKey(serverId: serverId))
+        }
+        NotificationCenter.default.post(name: stateDidChangeNotification, object: serverId)
+    }
+
+    /// Re-show a dismissed session-list push prompt if a question or permission ask arrives
+    /// while push is off for this server.
+    static func clearPromptDismissalOnAttentionIfNeeded(
+        serverId: String?,
+        defaults: UserDefaults = .standard
+    ) {
+        guard let serverId = serverId?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !serverId.isEmpty,
+              !isEnabled(serverId: serverId, defaults: defaults),
+              isPromptDismissed(serverId: serverId, defaults: defaults)
+        else {
+            return
+        }
+        setPromptDismissed(false, serverId: serverId, defaults: defaults)
     }
 
     // MARK: - Registration
@@ -75,15 +115,70 @@ final class PushRegistration {
 
     @discardableResult
     func register(api: APIClient, serverId: String, deviceId: String, relay: URL) async -> Bool {
+        Self.reportPushFallbacks()
+        switch await registerWithDetail(api: api, serverId: serverId, deviceId: deviceId, relay: relay) {
+        case .success:
+            return true
+        case .failure:
+            return false
+        }
+    }
+
+    /// Shared owner action for turning on push notifications for a server.
+    ///
+    /// Used by both `ServerPushNotificationsSection` in Server Settings and the
+    /// session-list notification ask card so neither duplicates registration or
+    /// opt-in rollback logic.
+    func turnOn(serverId: String, connection: ServerConnection?) async -> Result<Void, PushTurnOnError> {
+        #if DEBUG
+        if let hook = _turnOnForTesting {
+            return await hook(serverId)
+        }
+        #endif
+        guard let connection,
+              let relay = connection.pushRelay,
+              let api = connection.apiClient,
+              let deviceId = connection.credentials?.deviceCredential?.deviceId
+        else {
+            return .failure(.missingServerConnection)
+        }
+
+        Self.setEnabled(true, serverId: serverId)
+        let result = await registerWithDetail(
+            api: api,
+            serverId: serverId,
+            deviceId: deviceId,
+            relay: relay
+        )
+        switch result {
+        case .success:
+            Self.setPromptDismissed(false, serverId: serverId)
+            return .success(())
+        case .failure(let error):
+            Self.setEnabled(false, serverId: serverId)
+            return .failure(error)
+        }
+    }
+
+    func registerWithDetail(
+        api: APIClient,
+        serverId: String,
+        deviceId: String,
+        relay: URL
+    ) async -> Result<Void, PushTurnOnError> {
         let server = serverId.prefix(16)
         guard let environment = APNsEnvironment.current else {
             logger.error("Push registration skipped for server \(server, privacy: .public): no aps-environment")
-            return false
+            return .failure(.missingAPNsEnvironment)
         }
-        // A denied permission keeps the token off the relay: it could only deliver alerts iOS
-        // would not show.
-        guard let token = await currentDeviceToken(),
-              await AttentionNotificationService.shared.notificationsAuthorized() else { return false }
+        // Request/check notification permission first so a denied or undetermined
+        // authorization state is surfaced before waiting on APNs or the relay.
+        guard await AttentionNotificationService.shared.notificationsAuthorized() else {
+            return .failure(.notificationsNotAuthorized)
+        }
+        guard let token = await currentDeviceToken() else {
+            return .failure(.apnsTokenUnavailable(lastDeviceTokenError))
+        }
         Self.publishRedactionSnapshot()
         do {
             try await register(
@@ -96,10 +191,33 @@ final class PushRegistration {
                 retryWithNewRelayRegistration: true
             )
             logger.info("Push registered with server \(server, privacy: .public) (\(environment.rawValue, privacy: .public))")
-            return true
+            return .success(())
+        } catch let error as PushRegistrationError {
+            logger.error("Push registration failed for server \(server, privacy: .public): \(String(describing: error), privacy: .public)")
+            return .failure(.serverKeyMismatch)
+        } catch let error as PushRelayClient.RelayError {
+            logger.error("Push registration failed for server \(server, privacy: .public): \(String(describing: error), privacy: .public)")
+            return .failure(.relayRejected(Self.describeRelayError(error)))
         } catch {
             logger.error("Push registration failed for server \(server, privacy: .public): \(String(describing: error), privacy: .public)")
-            return false
+            return .failure(.registrationFailed(error.localizedDescription))
+        }
+    }
+
+    private static func describeRelayError(_ error: PushRelayClient.RelayError) -> String {
+        switch error {
+        case .gone:
+            "Push relay registration expired (410)."
+        case .tooManyPermissions:
+            "Push relay permission limit reached (409)."
+        case .rejected(let status, let code):
+            if let code, !code.isEmpty {
+                "Push relay rejected registration (HTTP \(status): \(code))."
+            } else {
+                "Push relay rejected registration (HTTP \(status))."
+            }
+        case .invalidResponse:
+            "Push relay returned an invalid response."
         }
     }
 
@@ -197,6 +315,26 @@ final class PushRegistration {
         pruneKeys(serverId: serverId, keeping: 0)
     }
 
+    /// Hand the extension's fallback records to client logs, which upload to the paired server
+    /// while Send Diagnostics is on. Kept on the phone while it is off.
+    private static func reportPushFallbacks() {
+        guard TelemetrySettings.allowsRemoteDiagnosticsUpload else { return }
+        let records = PushSharedStore.drainFallbacks()
+        for (index, record) in records.enumerated() {
+            var metadata = [
+                "reason": record.reason,
+                "shownAt": record.at.ISO8601Format(),
+            ]
+            if let detail = record.detail { metadata["detail"] = detail }
+            ClientLog.warning(
+                "PushFallback",
+                "Push shown as fallback: \(record.reason)",
+                metadata: metadata,
+                flush: index == records.count - 1
+            )
+        }
+    }
+
     // MARK: - Keys
 
     private struct PendingKey {
@@ -258,6 +396,7 @@ final class PushRegistration {
     func didRegisterForRemoteNotifications(deviceToken data: Data) {
         let token = data.map { String(format: "%02x", $0) }.joined()
         deviceToken = token
+        lastDeviceTokenError = nil
         resumeTokenWaiters(with: token)
     }
 
@@ -265,6 +404,7 @@ final class PushRegistration {
     /// signed without the Push Notifications entitlement.
     func didFailToRegisterForRemoteNotifications(error: Error) {
         logger.error("Failed to register for remote notifications: \(error.localizedDescription, privacy: .public)")
+        lastDeviceTokenError = error.localizedDescription
         resumeTokenWaiters(with: nil)
     }
 
@@ -292,6 +432,39 @@ final class PushRegistration {
 enum PushRegistrationError: Error {
     /// The server answered with an identity key other than the one pinned at pairing.
     case serverKeyMismatch
+}
+
+enum PushTurnOnError: LocalizedError, Equatable, Sendable {
+    case missingServerConnection
+    case missingAPNsEnvironment
+    case notificationsNotAuthorized
+    case apnsTokenUnavailable(String?)
+    case serverKeyMismatch
+    case relayRejected(String)
+    case registrationFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .missingServerConnection:
+            "Server connection is not ready. Wait for the server to connect and try again."
+        case .missingAPNsEnvironment:
+            "This build does not include the Push Notifications entitlement (no aps-environment)."
+        case .notificationsNotAuthorized:
+            "Notifications are turned off for Oppi in iOS Settings."
+        case .apnsTokenUnavailable(let detail):
+            if let detail, !detail.isEmpty {
+                "APNs device token unavailable: \(detail)"
+            } else {
+                "Could not obtain an APNs device token from iOS."
+            }
+        case .serverKeyMismatch:
+            "Server identity key did not match the paired server fingerprint."
+        case .relayRejected(let detail):
+            detail
+        case .registrationFailed(let detail):
+            "Push registration failed: \(detail)"
+        }
+    }
 }
 
 /// Body of `PUT /me/push-registration` (spec §5).

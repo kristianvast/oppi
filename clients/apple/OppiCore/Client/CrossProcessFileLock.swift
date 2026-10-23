@@ -14,7 +14,9 @@ import Foundation
 enum CrossProcessFileLock {
     enum LockError: LocalizedError {
         case appGroupUnavailable
-        case openFailed
+        /// `errno` from `open`; EPERM while the phone is locked means the lock file's data
+        /// protection class does not allow opening it then.
+        case openFailed(errno: Int32)
         case acquireFailed
 
         var errorDescription: String? {
@@ -59,7 +61,7 @@ enum CrossProcessFileLock {
             attributes: [.posixPermissions: 0o700]
         )
         let fd = open(url.path, O_CREAT | O_RDWR, 0o600)
-        guard fd >= 0 else { throw LockError.openFailed }
+        guard fd >= 0 else { throw LockError.openFailed(errno: errno) }
         guard flock(fd, LOCK_EX) == 0 else {
             close(fd)
             throw LockError.acquireFailed

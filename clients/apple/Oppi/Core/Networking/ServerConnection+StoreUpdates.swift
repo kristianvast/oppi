@@ -358,6 +358,7 @@ extension ServerConnection {
                 if let nextAsk = askRequestStore.pending(for: sessionId) {
                     AttentionNotificationService.shared.notifyAskIfNeeded(
                         nextAsk,
+                        sessionName: attentionSessionName(sessionId: nextAsk.sessionId),
                         activeSessionId: focusedSessionId,
                         hidesQuestionText: askTextIsLocked(nextAsk)
                     )

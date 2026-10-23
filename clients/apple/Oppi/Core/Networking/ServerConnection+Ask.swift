@@ -6,6 +6,9 @@ extension ServerConnection {
 
     func storeAskRequest(_ ask: AskRequest, for sessionId: String, isFocusedSession: Bool) {
         let inserted = askRequestStore.set(ask, for: sessionId)
+        if inserted {
+            PushRegistration.clearPromptDismissalOnAttentionIfNeeded(serverId: currentServerId)
+        }
         if let workspaceId = attentionWorkspaceId(
             explicitWorkspaceId: ask.workspaceId,
             sessionId: sessionId
@@ -15,6 +18,7 @@ extension ServerConnection {
         if inserted, ReleaseFeatures.localAttentionNotificationsEnabled {
             AttentionNotificationService.shared.notifyAskIfNeeded(
                 ask,
+                sessionName: attentionSessionName(sessionId: ask.sessionId),
                 activeSessionId: focusedSessionId,
                 hidesQuestionText: askTextIsLocked(ask)
             )
@@ -36,8 +40,17 @@ extension ServerConnection {
         AttentionNotificationService.shared.notifySessionDoneIfNeeded(
             sessionId: current.id,
             sessionName: current.name,
+            lastMessage: current.lastMessage,
             hidesSessionName: sessionTextIsLocked(current)
         )
+    }
+
+    /// What an ask banner calls its session: the name, or the first prompt while a fresh
+    /// session has none, as the server's push does.
+    func attentionSessionName(sessionId: String) -> String? {
+        let session = sessionStore.session(id: sessionId)
+        return AttentionNotificationPolicy.notificationLine(session?.name)
+            ?? AttentionNotificationPolicy.notificationLine(session?.firstMessage, max: 80)
     }
 
     /// Same rule as `askTextIsLocked` for a known session.
@@ -99,7 +112,8 @@ extension ServerConnection {
 
     /// Apply an authoritative session-scoped `/dialogs` snapshot.
     ///
-    /// A successful response replaces pending ask cards for this session only.
+    /// A successful response replaces pending ask cards and sheet-backed
+    /// extension dialogs for this session only.
     /// It does not schedule a new local notification: the caller just opened
     /// this session, and a failure path must not have cleared in-memory asks.
     func applySessionDialogsSnapshot(
@@ -115,10 +129,17 @@ extension ServerConnection {
             )
         }
         let asks = requests.compactMap(\.askRequest)
+        let extensionDialogs = requests.filter { $0.askRequest == nil }
 
         askRequestStore.remove(for: sessionId)
         for ask in asks {
             _ = askRequestStore.set(ask, for: sessionId)
+        }
+
+        if extensionDialogs.isEmpty {
+            pendingExtensionDialogQueues.removeValue(forKey: sessionId)
+        } else {
+            pendingExtensionDialogQueues[sessionId] = extensionDialogs
         }
 
         if ReleaseFeatures.localAttentionNotificationsEnabled {
@@ -126,7 +147,7 @@ extension ServerConnection {
         }
 
         if let workspaceId = attentionWorkspaceId(
-            explicitWorkspaceId: workspaceId ?? asks.first?.workspaceId,
+            explicitWorkspaceId: workspaceId ?? asks.first?.workspaceId ?? extensionDialogs.first?.workspaceId,
             sessionId: sessionId
         ) {
             syncWorkspaceSummary(workspaceId: workspaceId)
@@ -189,6 +210,7 @@ extension ServerConnection {
                 if let nextAsk = askRequestStore.pending(for: sessionId) {
                     AttentionNotificationService.shared.notifyAskIfNeeded(
                         nextAsk,
+                        sessionName: attentionSessionName(sessionId: nextAsk.sessionId),
                         activeSessionId: focusedSessionId,
                         hidesQuestionText: askTextIsLocked(nextAsk)
                     )
@@ -208,6 +230,7 @@ extension ServerConnection {
         for sessionId: String,
         isFocusedSession: Bool
     ) {
+        PushRegistration.clearPromptDismissalOnAttentionIfNeeded(serverId: currentServerId)
         appendExtensionDialog(request, for: sessionId)
         syncExtensionDialogWorkspaceSummary(sessionId: sessionId, explicitWorkspaceId: request.workspaceId)
         if isFocusedSession {

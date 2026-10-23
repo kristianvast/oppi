@@ -1,4 +1,6 @@
 import SwiftUI
+import UIKit
+import UserNotifications
 
 enum ProviderSetupState: Equatable {
     case unknown
@@ -6,10 +8,236 @@ enum ProviderSetupState: Equatable {
     case needsConfiguration
     case configured
 
-    init(providerStatuses: [ProviderAuthProviderStatus]) {
-        self = providerStatuses.contains(where: \.authenticated)
+    init(
+        providerStatuses: [ProviderAuthProviderStatus],
+        authenticatedModelCount: Int = 0,
+        hasExternalTerminalLauncher: Bool = false
+    ) {
+        self = (providerStatuses.contains(where: \.authenticated)
+            || authenticatedModelCount > 0
+            || hasExternalTerminalLauncher)
             ? .configured
             : .needsConfiguration
+    }
+}
+
+enum PushNotificationPromptCardState: Equatable, Sendable {
+    case hidden
+    case turnOn
+    case openSettings
+}
+
+enum PushNotificationPromptPolicy {
+    enum AuthorizationStatus: Equatable, Sendable {
+        case notDetermined
+        case denied
+        case authorized
+
+        init(systemStatus: UNAuthorizationStatus) {
+            switch systemStatus {
+            case .authorized, .provisional, .ephemeral:
+                self = .authorized
+            case .denied:
+                self = .denied
+            case .notDetermined:
+                self = .notDetermined
+            @unknown default:
+                self = .notDetermined
+            }
+        }
+    }
+
+    static func cardState(
+        authorizationStatus: AuthorizationStatus,
+        isOptedIn: Bool,
+        relayAdvertised: Bool,
+        isDismissed: Bool
+    ) -> PushNotificationPromptCardState {
+        guard relayAdvertised, !isDismissed else { return .hidden }
+        if isOptedIn, authorizationStatus == .authorized {
+            return .hidden
+        }
+        switch authorizationStatus {
+        case .denied:
+            return .openSettings
+        case .notDetermined, .authorized:
+            return .turnOn
+        }
+    }
+}
+
+struct SessionListPushPromptSection: View {
+    let serverId: String
+    let connection: ServerConnection?
+
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openURL) private var openURL
+
+    @State private var authorizationStatus: PushNotificationPromptPolicy.AuthorizationStatus = .notDetermined
+    @State private var isOptedIn = false
+    @State private var isDismissed = false
+    @State private var isTurningOn = false
+    @State private var inlineError: String?
+
+    private var cardState: PushNotificationPromptPolicy.PushCardPresentation {
+        PushNotificationPromptPolicy.PushCardPresentation(
+            state: PushNotificationPromptPolicy.cardState(
+                authorizationStatus: authorizationStatus,
+                isOptedIn: isOptedIn,
+                relayAdvertised: ReleaseFeatures.pushNotificationsEnabled && connection?.pushRelay != nil,
+                isDismissed: isDismissed
+            )
+        )
+    }
+
+    var body: some View {
+        Group {
+            if cardState.isVisible {
+                ProviderSetupPromptListSection {
+                    cardContent
+                }
+            }
+        }
+        .task(id: serverId) {
+            inlineError = nil
+            await refreshState()
+        }
+        .onChange(of: connection?.pushRelay) { _, _ in
+            Task { await refreshState() }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                Task { await refreshState() }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: PushRegistration.stateDidChangeNotification)) { _ in
+            Task { await refreshState() }
+        }
+    }
+
+    private var cardContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 8) {
+                Label("Get notified when agents need you", systemImage: "bell.badge.fill")
+                    .font(.headline)
+                    .foregroundStyle(.themeFg)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button {
+                    dismissPrompt()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.themeComment)
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss notification prompt")
+                .accessibilityIdentifier("workspace.pushPrompt.dismiss")
+            }
+
+            Text(
+                cardState.state == .openSettings
+                    ? "Allow notifications for Oppi in iOS Settings so questions and approvals can alert you."
+                    : "Turn on encrypted push notifications for this server to get questions, approvals, and finished runs."
+            )
+            .font(.subheadline)
+            .foregroundStyle(.themeComment)
+
+            if let inlineError, !inlineError.isEmpty {
+                Label(inlineError, systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote)
+                    .foregroundStyle(.themeOrange)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("workspace.pushPrompt.error")
+            }
+
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+
+                if cardState.state == .openSettings {
+                    Button("Open Settings") {
+                        openNotificationSettings()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .accessibilityIdentifier("workspace.pushPrompt.openSettings")
+                } else {
+                    Button {
+                        turnOnPush()
+                    } label: {
+                        HStack(spacing: 8) {
+                            if isTurningOn {
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                            Text("Turn on")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .disabled(isTurningOn)
+                    .accessibilityIdentifier("workspace.pushPrompt.turnOn")
+                }
+
+                Spacer(minLength: 0)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(.themeComment.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(.themeComment.opacity(0.18), lineWidth: 1)
+        )
+        .accessibilityIdentifier("workspace.pushPrompt.card")
+    }
+
+    private func refreshState() async {
+        isOptedIn = PushRegistration.isEnabled(serverId: serverId)
+        isDismissed = PushRegistration.isPromptDismissed(serverId: serverId)
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        authorizationStatus = PushNotificationPromptPolicy.AuthorizationStatus(
+            systemStatus: settings.authorizationStatus
+        )
+    }
+
+    private func turnOnPush() {
+        guard !isTurningOn else { return }
+        isTurningOn = true
+        inlineError = nil
+        Task {
+            let outcome = await PushRegistration.shared.turnOn(
+                serverId: serverId,
+                connection: connection
+            )
+            await refreshState()
+            isTurningOn = false
+            switch outcome {
+            case .success:
+                inlineError = nil
+            case .failure(let error):
+                inlineError = error.errorDescription
+            }
+        }
+    }
+
+    private func openNotificationSettings() {
+        guard let url = URL(string: UIApplication.openNotificationSettingsURLString) else { return }
+        openURL(url)
+    }
+
+    private func dismissPrompt() {
+        PushRegistration.setPromptDismissed(true, serverId: serverId)
+        isDismissed = true
+    }
+}
+
+extension PushNotificationPromptPolicy {
+    struct PushCardPresentation: Equatable {
+        let state: PushNotificationPromptCardState
+        var isVisible: Bool { state != .hidden }
     }
 }
 

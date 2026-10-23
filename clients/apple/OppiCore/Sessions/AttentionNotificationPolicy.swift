@@ -64,21 +64,38 @@ enum AttentionNotificationPolicy: Sendable {
         return previousState != .done
     }
 
+    /// A session with neither a name nor a last message: like the server, Oppi posts no alert
+    /// that cannot say what it is about.
+    static func sessionDoneIsAnonymous(sessionName: String?, lastMessage: String?) -> Bool {
+        notificationLine(sessionName) == nil && notificationLine(lastMessage) == nil
+    }
+
+    /// One trimmed line, nil when blank, capped at `max` characters like the server's push text.
+    static func notificationLine(_ text: String?, max: Int = 240) -> String? {
+        guard let text else { return nil }
+        let line = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        guard !line.isEmpty else { return nil }
+        return line.count <= max ? line : String(line.prefix(max - 1)) + "\u{2026}"
+    }
+
     /// Local stand-in for the server's `done` push: same title, body, category, and
     /// tap-routing key (`sessionId`). The push names the session; this banner hides the name
-    /// while App Lock or a scoped lock covers it, like ask banners.
+    /// and the last message while App Lock or a scoped lock covers it, like ask banners.
+    /// Callers skip the banner when `sessionDoneIsAnonymous`.
     static func sessionDonePayload(
         sessionId: String,
         sessionName: String?,
+        lastMessage: String? = nil,
         revealsSessionName: Bool
     ) -> AttentionNotificationPayload {
-        let name = sessionName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let name = notificationLine(sessionName)
+        let detail = notificationLine(lastMessage)
         let text = PushAlertPresentation.fixedText(event: .done, kind: nil)
         return AttentionNotificationPayload(
             identifier: sessionDoneRequestIdentifier(sessionId: sessionId),
             title: text.title,
-            subtitle: revealsSessionName ? name : "",
-            body: text.body,
+            subtitle: revealsSessionName ? (name ?? "") : "",
+            body: revealsSessionName ? (detail ?? text.body) : text.body,
             categoryIdentifier: sessionDoneCategoryId,
             userInfo: [
                 "event": "done",
@@ -96,14 +113,33 @@ enum AttentionNotificationPolicy: Sendable {
             : String(localized: "Open Oppi to answer questions.")
     }
 
-    /// - Parameter revealsQuestionText: false while iOS App Lock is on, so the
-    ///   banner, Lock Screen, and Notification Center never show the question.
-    static func askPayload(for ask: AskRequest, revealsQuestionText: Bool = true) -> AttentionNotificationPayload {
+    /// - Parameters:
+    ///   - sessionName: the session's name or first prompt. When given and revealed, it is the
+    ///     subtitle and the body counts the remaining questions; otherwise the subtitle counts them.
+    ///   - revealsQuestionText: false while iOS App Lock or a scoped lock is on, so the
+    ///     banner, Lock Screen, and Notification Center never show the question or the session.
+    static func askPayload(
+        for ask: AskRequest,
+        sessionName: String? = nil,
+        revealsQuestionText: Bool = true
+    ) -> AttentionNotificationPayload {
         let questionCount = ask.questions.count
-        let firstQuestion = ask.questions.first?.question.trimmingCharacters(in: .whitespacesAndNewlines)
+        let first = ask.questions.first
+        let firstQuestion = notificationLine(first?.question, max: 500)
+        let name = revealsQuestionText ? notificationLine(sessionName, max: 80) : nil
+        let countLabel = questionCount == 1 ? String(localized: "1 question") : "\(questionCount) questions"
         let body: String
-        if revealsQuestionText, let firstQuestion, !firstQuestion.isEmpty {
-            body = firstQuestion
+        if revealsQuestionText, let firstQuestion {
+            var lines = [firstQuestion]
+            let options = (first?.options ?? []).compactMap { notificationLine($0.label, max: 80) }
+            if !options.isEmpty {
+                lines.append(options.joined(separator: " \u{00b7} "))
+            }
+            let more = questionCount - 1
+            if name != nil, more > 0 {
+                lines.append(more == 1 ? String(localized: "+1 more question") : "+\(more) more questions")
+            }
+            body = lines.joined(separator: "\n")
         } else {
             body = redactedAskBody(questionCount: questionCount)
         }
@@ -111,7 +147,7 @@ enum AttentionNotificationPolicy: Sendable {
         return AttentionNotificationPayload(
             identifier: askRequestIdentifier(sessionId: ask.sessionId),
             title: String(localized: "Question from agent"),
-            subtitle: questionCount == 1 ? String(localized: "1 question") : "\(questionCount) questions",
+            subtitle: name ?? countLabel,
             body: body,
             categoryIdentifier: askCategoryId,
             userInfo: [

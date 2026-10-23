@@ -376,6 +376,23 @@ struct QuickSessionTests {
         #expect(AppPreferences.QuickSession.lastWorkspaceId == nil)
     }
 
+    @Test func preferredWorkspaceDefaultsToHomeBeforeFirstAvailable() {
+        UserDefaults.standard.removeObject(
+            forKey: "\(AppIdentifiers.subsystem).quickSession.lastWorkspaceId"
+        )
+        AppPreferences.QuickSession.saveDefaultWorkspaceId(nil)
+
+        let selection = AppPreferences.QuickSession.preferredWorkspaceSelection(
+            in: [
+                (id: "alpha-ws", name: "Alpha"),
+                (id: "home-ws", name: "Home"),
+                (id: "zeta-ws", name: "Zeta"),
+            ]
+        )
+
+        #expect(selection == .init(id: "home-ws", source: "home"))
+    }
+
     @Test func pendingDictationCleanupRoundTripAndDedupes() {
         AppPreferences.QuickSession.clearPendingDictationCleanups()
         let cleanup = AppPreferences.QuickSession.PendingDictationCleanup(

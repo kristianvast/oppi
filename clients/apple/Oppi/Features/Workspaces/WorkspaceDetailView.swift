@@ -494,6 +494,13 @@ struct WorkspaceDetailView: View {
         let data = viewData
 
         List {
+            if let currentServerId {
+                SessionListPushPromptSection(
+                    serverId: currentServerId,
+                    connection: connection
+                )
+            }
+
             if hasSessionSearchQuery {
                 if searchStore.isSearching && data.searchMatches.isEmpty && data.localFiltered.isEmpty {
                     Section {

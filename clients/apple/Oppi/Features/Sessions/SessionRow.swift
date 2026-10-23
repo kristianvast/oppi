@@ -86,6 +86,10 @@ struct SessionRow: View {
         SessionStatusKind.resolve(session: session, pendingAskCount: pendingAskCount, seenAt: seenAt)
     }
 
+    private var workingMessage: String? {
+        SessionStatusKind.workingMessage(for: session)
+    }
+
     private var visibleModelSummaries: [SessionModelSummary] {
         if !modelSummaries.isEmpty {
             return modelSummaries
@@ -258,6 +262,7 @@ struct SessionRow: View {
             || shownCompactionCount > 0
             || worktreeIndicator != nil
             || attentionText?.isEmpty == false
+            || workingMessage?.isEmpty == false
     }
 
     private var hasContextRow: Bool {
@@ -302,6 +307,13 @@ struct SessionRow: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .accessibilityIdentifier("session.attentionPreview.\(session.id)")
+        } else if let workingMessage, !workingMessage.isEmpty {
+            Text(workingMessage)
+                .font(.caption2)
+                .foregroundStyle(.themeBlue)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .accessibilityIdentifier("session.workingMessage.\(session.id)")
         }
     }
 
@@ -335,6 +347,12 @@ struct SessionRow: View {
                 .foregroundStyle(statusKind.tint(theme))
                 .accessibilityHidden(true)
                 .accessibilityIdentifier("session.attentionBadge.\(session.id)")
+        } else if statusKind == .working {
+            Image(systemName: statusKind.terminalSymbol)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(statusKind.tint(theme))
+                .accessibilityHidden(true)
+                .accessibilityIdentifier("session.workingBadge.\(session.id)")
         }
 
         SessionStatusPill(statusKind)

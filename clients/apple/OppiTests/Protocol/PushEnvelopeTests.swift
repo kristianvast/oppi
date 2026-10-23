@@ -199,13 +199,13 @@ struct PushEnvelopeTests {
         let keyId = Data(repeating: 1, count: 16)
         let now = Date()
         func accept(_ byte: UInt8) -> Bool {
-            PushSharedStore.acceptMessage(
+            PushSharedStore.checkMessage(
                 Data(repeating: byte, count: 32),
                 keyId: keyId,
                 now: now,
                 ledgerURL: url,
                 liveKeyIds: { [keyId.base64URLEncodedString] }
-            )
+            ) == .accepted
         }
 
         #expect(accept(1))
@@ -225,14 +225,43 @@ struct PushEnvelopeTests {
             try? FileManager.default.removeItem(at: directory)
         }
 
-        let accepted = PushSharedStore.acceptMessage(
+        let check = PushSharedStore.checkMessage(
             Data(repeating: 1, count: 32),
             keyId: Data(repeating: 1, count: 16),
             now: Date(),
             ledgerURL: url,
             liveKeyIds: { [] }
         )
-        #expect(!accepted)
+        // Reported as a ledger failure, not as a replay.
+        guard case .ledgerNotSaved = check else {
+            Issue.record("expected ledgerNotSaved, got \(check)")
+            return
+        }
+        #expect(check.failureDetail != nil)
+    }
+
+    @Test func fallbackJournalKeepsTheNewestRecordsUntilDrained() throws {
+        let directory = try Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("fallbacks.json")
+        let start = Date(timeIntervalSince1970: 1_000)
+        for index in 0..<(PushFallbackJournal.capacity + 2) {
+            try PushFallbackJournal.append(
+                PushFallbackRecord(
+                    at: start.addingTimeInterval(TimeInterval(index)),
+                    reason: index == 0 ? "stale" : "replay",
+                    detail: index.isMultiple(of: 2) ? "lockOpenFailed errno=1" : nil
+                ),
+                to: url
+            )
+        }
+
+        let drained = PushFallbackJournal.drain(url)
+        #expect(drained.count == PushFallbackJournal.capacity)
+        #expect(drained.first?.at == start.addingTimeInterval(2))
+        #expect(drained.last?.at == start.addingTimeInterval(TimeInterval(PushFallbackJournal.capacity + 1)))
+        #expect(drained.first?.detail == "lockOpenFailed errno=1")
+        #expect(PushFallbackJournal.drain(url).isEmpty)
     }
 
     // MARK: - Presentation

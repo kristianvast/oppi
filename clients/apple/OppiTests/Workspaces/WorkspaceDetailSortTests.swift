@@ -168,6 +168,69 @@ struct WorkspaceDetailSortTests {
         #expect(sorted.map(\.id) == ["older", "newer"])
     }
 
+    @Test func liveHomeMirrorSessionsSortAheadOfOtherMirrorsAndPlainSessionsWithinTier() {
+        var plain = makeSession(id: "plain", lastActivity: baseTime.addingTimeInterval(-300))
+        plain.workspaceName = "Project"
+
+        var projectMirror = makeSession(id: "project-mirror", lastActivity: baseTime.addingTimeInterval(-120))
+        projectMirror.workspaceName = "Project"
+        projectMirror.runtime = .piTui
+        projectMirror.mirror = PiTuiMirrorSessionMetadata(status: "connected")
+
+        var homeMirror = makeSession(id: "home-mirror", lastActivity: baseTime)
+        homeMirror.workspaceName = "Home"
+        homeMirror.runtime = .piTui
+        homeMirror.mirror = PiTuiMirrorSessionMetadata(status: "connected")
+
+        var disconnectedHomeMirror = makeSession(id: "disconnected-home", lastActivity: baseTime.addingTimeInterval(-600))
+        disconnectedHomeMirror.workspaceName = "Home"
+        disconnectedHomeMirror.runtime = .piTui
+        disconnectedHomeMirror.mirror = PiTuiMirrorSessionMetadata(status: "disconnected")
+
+        let sorted = yourTurnSorted(
+            [plain, disconnectedHomeMirror, projectMirror, homeMirror],
+            hasAskInQueue: { _ in false }
+        )
+
+        #expect(sorted.map(\.id) == ["home-mirror", "project-mirror", "disconnected-home", "plain"])
+    }
+
+    @Test func workingSectionPromotesLiveHomeMirrorsBeforeOtherWorkingSessions() {
+        var newerManaged = makeSession(
+            id: "managed",
+            status: .busy,
+            createdAt: baseTime.addingTimeInterval(120),
+            lastActivity: baseTime.addingTimeInterval(120)
+        )
+        newerManaged.workspaceName = "Project"
+
+        var olderHomeMirror = makeSession(
+            id: "home-mirror",
+            status: .busy,
+            createdAt: baseTime,
+            lastActivity: baseTime
+        )
+        olderHomeMirror.workspaceName = "Home"
+        olderHomeMirror.runtime = .piTui
+        olderHomeMirror.mirror = PiTuiMirrorSessionMetadata(status: "connected")
+
+        let split = SessionInboxGrouping.split(
+            items: SessionListEntries.flat([newerManaged, olderHomeMirror]),
+            session: \.representative,
+            attention: { _ in .none }
+        )
+
+        #expect(split.working.map(\.id) == ["home-mirror", "managed"])
+    }
+
+    @Test func workspaceListPromotesHomeWhenIdleCountsAndActivityTie() {
+        let alpha = Workspace(id: "w-alpha", name: "Alpha", createdAt: baseTime, updatedAt: baseTime)
+        let home = Workspace(id: "w-home", name: "Home", createdAt: baseTime, updatedAt: baseTime)
+        let sorted = sortedWorkspacesForList([alpha, home], summaries: [:])
+
+        #expect(sorted.map(\.id) == ["w-home", "w-alpha"])
+    }
+
     @Test func deleteConfirmationClearsPendingBeforeDeleteCallback() {
         let session = makeSession(id: "delete-me")
         var pendingSession: Session? = session

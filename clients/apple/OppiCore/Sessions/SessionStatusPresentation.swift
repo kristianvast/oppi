@@ -126,6 +126,24 @@ extension SessionStatusKind {
         return fromLifecycle(session: session, pendingAskCount: pendingAskCount, seenAt: seenAt)
     }
 
+    /// Server-provided working message when `programStatus.state == .working` and the message
+    /// is non-empty and distinct from the session's own title (e.g. background activity or compaction).
+    static func workingMessage(for session: Session) -> String? {
+        guard resolve(session: session, seenAt: nil) == .working,
+              let programStatus = session.programStatus,
+              programStatus.state == .working,
+              let raw = programStatus.message?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty
+        else {
+            return nil
+        }
+        let sessionName = session.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !sessionName.isEmpty, raw == sessionName {
+            return nil
+        }
+        return raw
+    }
+
     private static func resolve(
         programStatus: ProgramStatus,
         session: Session,
@@ -150,7 +168,15 @@ extension SessionStatusKind {
         case .stopping:
             return resolve(programStatus: programStatus, seenAt: seenAt)
         case .ready:
-            if programStatus.state == .working { return nil }
+            if programStatus.state == .working {
+                // Mirrored TUI sessions can report `programStatus.state == .working` with a
+                // background-activity message while the parent turn is `.ready`.
+                let rawMessage = programStatus.message?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let sessionName = session.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let hasDistinctWorkingMessage = !rawMessage.isEmpty && rawMessage != sessionName
+                guard session.runtime == .piTui || hasDistinctWorkingMessage else { return nil }
+                return .working
+            }
             return resolve(programStatus: programStatus, seenAt: seenAt)
         case .error:
             switch programStatus.state {

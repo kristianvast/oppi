@@ -8,7 +8,8 @@ import UserNotifications
 /// signature, decrypts with this device's push key, checks freshness and replay, applies App
 /// Lock and scoped-lock redaction, and shows the result. Anything that fails a check, or a
 /// timeout, shows the fixed fallback: never a field from the failed push. Each fallback logs
-/// its rejection reason, and nothing from the push.
+/// its rejection reason, and nothing from the push, and records it for the app to report to
+/// the server's diagnostics.
 final class NotificationService: UNNotificationServiceExtension {
     private var contentHandler: ((UNNotificationContent) -> Void)?
 
@@ -18,14 +19,20 @@ final class NotificationService: UNNotificationServiceExtension {
     ) {
         self.contentHandler = contentHandler
         let now = Date()
+        var replayCheck: PushSharedStore.ReplayCheck?
         let result = PushNotificationOpening.open(
             userInfo: request.content.userInfo,
             now: now,
             key: { PushSharedStore.loadKey(keyId: $0)?.material },
-            acceptMessage: { PushSharedStore.acceptMessage($0, keyId: $1, now: now) }
+            acceptMessage: { messageId, keyId in
+                let check = PushSharedStore.checkMessage(messageId, keyId: keyId, now: now)
+                replayCheck = check
+                return check == .accepted
+            }
         )
         if case .failure(let reason) = result {
             PushSharedStore.logger.notice("Push shown as fallback: \(reason.rawValue, privacy: .public)")
+            PushSharedStore.recordFallback(reason: reason.rawValue, detail: replayCheck?.failureDetail, now: now)
         }
         deliver(PushNotificationOpening.presentation(
             for: result,
@@ -36,6 +43,7 @@ final class NotificationService: UNNotificationServiceExtension {
     override func serviceExtensionTimeWillExpire() {
         if contentHandler != nil {
             PushSharedStore.logger.notice("Push shown as fallback: timeout")
+            PushSharedStore.recordFallback(reason: "timeout", detail: nil, now: Date())
         }
         deliver(.fallback)
     }

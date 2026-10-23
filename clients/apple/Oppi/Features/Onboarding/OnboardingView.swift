@@ -184,6 +184,9 @@ struct OnboardingView: View {
                             }
                         }
                         .buttonStyle(.bordered)
+
+                        DiagnosticsShareButton()
+                            .buttonStyle(.bordered)
                     }
                 }
             }

@@ -123,11 +123,22 @@ struct SessionListEntry: Sendable, Equatable, Identifiable {
     /// `ForEach` id for stopped sections; see `SessionListPresentation.stoppedRowID`.
     var stoppedListID: String { SessionListPresentation.stoppedRowID(id) }
 
-    /// Session that dates and orders the row: a thread sorts by its latest member.
+    /// Session that dates and orders the row: a thread sorts by its latest member,
+    /// and inherits live mirror / Home workspace prominence if any active member has it.
     var representative: Session {
         guard let thread else { return session }
         var representative = session
         representative.lastActivity = thread.latestActivity
+        if let bestMirrorMember = thread.members
+            .filter({ $0.status != .stopped })
+            .max(by: { SessionListPresentation.liveMirrorRank($0) < SessionListPresentation.liveMirrorRank($1) }),
+           SessionListPresentation.liveMirrorRank(bestMirrorMember) > SessionListPresentation.liveMirrorRank(representative) {
+            representative.runtime = bestMirrorMember.runtime
+            representative.mirror = bestMirrorMember.mirror
+            if SessionListPresentation.isHomeSession(bestMirrorMember) {
+                representative.workspaceName = bestMirrorMember.workspaceName
+            }
+        }
         return representative
     }
 

@@ -15,6 +15,60 @@ struct AttentionNotificationServiceTests {
         )
     }
 
+    @Test func askBannerNamesSessionAndListsChoices() {
+        let ask = AskRequest(
+            id: "ask-1",
+            sessionId: "s1",
+            questions: [
+                AskQuestion(
+                    id: "q1",
+                    question: " Which database? ",
+                    options: [AskOption(value: "pg", label: "Postgres"), AskOption(value: "lite", label: "SQLite")],
+                    multiSelect: false
+                ),
+                AskQuestion(id: "q2", question: "Migrate now?", options: [], multiSelect: false),
+            ],
+            allowCustom: true,
+            timeout: nil
+        )
+
+        let payload = AttentionNotificationPolicy.askPayload(for: ask, sessionName: "Fix login")
+        #expect(payload.subtitle == "Fix login")
+        #expect(payload.body == "Which database?\nPostgres \u{00b7} SQLite\n+1 more question")
+
+        // A lock hides the session and the question alike.
+        let locked = AttentionNotificationPolicy.askPayload(
+            for: ask,
+            sessionName: "Fix login",
+            revealsQuestionText: false
+        )
+        #expect(locked.subtitle == "2 questions")
+        #expect(locked.body == AttentionNotificationPolicy.redactedAskBody(questionCount: 2))
+    }
+
+    @Test func doneBannerSaysWhatFinishedOrIsSkipped() {
+        #expect(AttentionNotificationPolicy.sessionDoneIsAnonymous(sessionName: " ", lastMessage: nil))
+        #expect(!AttentionNotificationPolicy.sessionDoneIsAnonymous(sessionName: nil, lastMessage: "Fixed it."))
+
+        let payload = AttentionNotificationPolicy.sessionDonePayload(
+            sessionId: "s1",
+            sessionName: "Fix login",
+            lastMessage: "Fixed the\n\nlogin test.",
+            revealsSessionName: true
+        )
+        #expect(payload.subtitle == "Fix login")
+        #expect(payload.body == "Fixed the login test.")
+
+        let locked = AttentionNotificationPolicy.sessionDonePayload(
+            sessionId: "s1",
+            sessionName: "Fix login",
+            lastMessage: "Fixed the login test.",
+            revealsSessionName: false
+        )
+        #expect(locked.subtitle.isEmpty)
+        #expect(locked.body == PushAlertPresentation.fixedText(event: .done, kind: nil).body)
+    }
+
     @Test func notifiesWhenForegroundedForDifferentSession() {
         #expect(
             AttentionNotificationService.shouldNotify(
@@ -276,6 +330,8 @@ struct SessionNotificationOpenPathTests {
 
         let navigation = AppNavigation()
         navigation.launchPhase = .ready
+        navigation.showQuickSession = true
+        QuickSessionTrigger.shared.isPresented = true
         navigation.openWorkspaceSession(.init(
             serverId: "server-1",
             sessionId: "parent",
@@ -290,6 +346,8 @@ struct SessionNotificationOpenPathTests {
             source: .externalURL
         )
 
+        #expect(!navigation.showQuickSession)
+        #expect(!QuickSessionTrigger.shared.isPresented)
         #expect(navigation.workspaceStackDiagnosticContext.sessionId == "child")
         #expect(navigation.workspacePath.count == 1)
         #expect(connection.focusedSessionId == "child")

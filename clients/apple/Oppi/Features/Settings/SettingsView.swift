@@ -83,6 +83,12 @@ struct SettingsView: View {
                 }
                 .accessibilityIdentifier("settings.row.storage")
             }
+
+            Section {
+                DiagnosticsShareButton()
+            } footer: {
+                Text("Saves this app launch's logs, including network and TLS errors, for sharing.")
+            }
         }
         .settingsPage("Settings", titleDisplayMode: .large)
         .accessibilityIdentifier("settings.list")

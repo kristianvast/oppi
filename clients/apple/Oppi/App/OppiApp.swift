@@ -244,7 +244,16 @@ enum SessionNotificationOpen {
         source: SessionNavigationSource,
         workspaceIdHint: String? = nil
     ) async {
-        await connection.prepareExternalSessionOpen(sessionId: sessionId)
+        if navigation.showQuickSession {
+            navigation.pendingQuickSessionLaunchContext = nil
+            navigation.pendingQuickSessionStartDictation = false
+            navigation.showQuickSession = false
+            QuickSessionTrigger.shared.isPresented = false
+        }
+        await connection.prepareExternalSessionOpen(
+            sessionId: sessionId,
+            workspaceIdHint: workspaceIdHint
+        )
         let workspaceId = connection.sessionReentryWorkspaceId(
             for: sessionId,
             workspaceIdHint: workspaceIdHint

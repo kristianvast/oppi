@@ -888,6 +888,30 @@ struct AskRequestTests {
         #expect(conn.askRequestStore.pending(for: "s2") == nil)
     }
 
+    @Test @MainActor func sessionDialogsSnapshotHydratesAndClearsSheetBackedExtensionDialogs() {
+        let conn = ServerConnection()
+        conn.sessionStore.upsert(makeTestSession(id: "s2", workspaceId: "w1", status: .busy))
+
+        conn.applySessionDialogsSnapshot(
+            sessionId: "s2",
+            workspaceId: "w1",
+            dialogs: [
+                ExtensionUIRequest.DialogSnapshot(
+                    id: "editor-1",
+                    method: "editor",
+                    title: "Edit plan",
+                    prefill: "initial"
+                ),
+            ]
+        )
+
+        #expect(conn.askRequestStore.pending(for: "s2") == nil)
+        #expect(conn.pendingExtensionDialogQueues["s2"]?.map(\.id) == ["editor-1"])
+
+        conn.applySessionDialogsSnapshot(sessionId: "s2", workspaceId: "w1", dialogs: [])
+        #expect(conn.pendingExtensionDialogQueues["s2"] == nil)
+    }
+
     @Test @MainActor func sessionDialogsHydrateLoadsAskWhenStoreIsEmpty() async {
         let conn = ServerConnection()
         conn.sessionStore.upsert(makeTestSession(id: "s2", workspaceId: "w1", status: .stopped))

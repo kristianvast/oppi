@@ -103,6 +103,22 @@ struct IntentSessionRankingTests {
 
         #expect(ranked.map(\.id) == ["default", "alpha"])
     }
+
+    @Test func prefersHomeWorkspaceWhenNoLastUsedOrDefaultIsSet() {
+        let ranked = IntentSessionRanking.rank(
+            [
+                Item(id: "beta", name: "Beta"),
+                Item(id: "home", name: "Home"),
+                Item(id: "alpha", name: "Alpha"),
+            ],
+            id: \.id,
+            name: \.name,
+            lastUsedId: nil,
+            defaultId: nil
+        )
+
+        #expect(ranked.map(\.id) == ["home", "alpha", "beta"])
+    }
 }
 
 @Suite("WorkspaceEntity identity")

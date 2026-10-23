@@ -135,6 +135,12 @@ struct SessionRowPresentation: Equatable, Sendable {
         SessionStatusKind.resolve(session: session, pendingAskCount: pendingAskCount, seenAt: seenAt)
     }
 
+    /// Server-supplied `programStatus.message` when the session is working and the message
+    /// carries distinct status text (e.g. background activities).
+    var workingMessage: String? {
+        SessionStatusKind.workingMessage(for: session)
+    }
+
     var visibleModelSummaries: [SessionModelSummary] {
         if !modelSummaries.isEmpty {
             return modelSummaries

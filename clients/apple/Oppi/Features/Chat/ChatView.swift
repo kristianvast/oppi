@@ -432,7 +432,11 @@ struct ChatView: View {
     }
 
     private var isBusy: Bool {
-        session?.status == .busy || session?.status == .stopping
+        guard let session else { return false }
+        if session.status == .busy || session.status == .stopping {
+            return true
+        }
+        return SessionStatusKind.resolve(session: session, seenAt: nil) == .working
     }
 
     private var isStopping: Bool {
@@ -492,6 +496,16 @@ struct ChatView: View {
         connection.extensionSurfaceBySession[sessionId]
     }
 
+    private var effectiveWorkingState: ExtensionWorkingState? {
+        if let working = extensionSurfaceState?.working {
+            return working
+        }
+        if let session, let message = SessionStatusKind.workingMessage(for: session) {
+            return ExtensionWorkingState(message: message)
+        }
+        return nil
+    }
+
     private var activeComposerAskRequest: AskRequest? {
         askRequestStore.pending(for: sessionId)
     }
@@ -541,7 +555,7 @@ struct ChatView: View {
             agentIcon: session?.launch?.agentIcon,
             routeScope: focusedRouteScope,
             isBusy: isBusy,
-            extensionWorkingState: extensionSurfaceState?.working,
+            extensionWorkingState: effectiveWorkingState,
             extensionHiddenThinkingLabel: extensionSurfaceState?.hiddenThinkingLabel,
             currentModel: session?.model,
             sessionContent: connection.sessionContent,
@@ -1742,11 +1756,15 @@ struct ChatView: View {
             terminalMirrorIndicator: TerminalMirrorIndicatorPresentation(session: session),
             maxWidth: chatPrincipalTitleMaxWidth,
             showsDurableLabel: durableSessionsExperimentEnabled && session?.engine == .durable,
-            subtitle: conversationTitleSubtitle
+            subtitle: conversationTitleSubtitle,
+            workingMessage: session.flatMap(SessionStatusKind.workingMessage(for:))
         )
     }
 
     private var conversationTitleSubtitle: String? {
+        if let session, let workingMessage = SessionStatusKind.workingMessage(for: session) {
+            return workingMessage
+        }
         guard timelineChromeStyle == .conversation, let model = session?.model else { return nil }
         return "\(shortModelName(model)) \u{00B7} \(chatState.thinkingLevel.compactTitle)"
     }
@@ -3190,15 +3208,28 @@ struct ChatSessionTitleView: View {
     /// Durable Sessions experiment: marks a durable-engine session.
     var showsDurableLabel = false
     /// Conversation layout: model and thinking under the title, e.g.
-    /// "gpt-5 \u{00B7} High".
+    /// "gpt-5 \u{00B7} High", or server-supplied working message.
     var subtitle: String? = nil
+    /// Non-empty when `programStatus.state == .working` carries a distinct working message.
+    var workingMessage: String? = nil
     var iconIsDecorative = true
     var iconAccessibilityIdentifier: String?
 
     var body: some View {
         VStack(spacing: 1) {
             titleRow
-            if let subtitle {
+            if let workingMessage, !workingMessage.isEmpty {
+                HStack(spacing: 4) {
+                    Image(systemName: SessionStatusKind.working.terminalSymbol)
+                        .font(.caption2.weight(.semibold))
+                    Text(workingMessage)
+                        .font(.caption2.weight(.medium))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                .foregroundStyle(.themeBlue)
+                .accessibilityIdentifier("chat.title.workingMessage")
+            } else if let subtitle {
                 Text(subtitle)
                     .font(.caption2)
                     .foregroundStyle(.themeComment)

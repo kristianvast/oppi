@@ -215,6 +215,7 @@
 		1915FBFD1AC73B45D2678757 /* DictationDictionarySelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EBE1810196B133A25004ED1 /* DictationDictionarySelectionTests.swift */; };
 		197B2B1E64E8EAB9DA5C6376 /* ThemeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA30C639ED076263555275E4 /* ThemeStore.swift */; };
 		19AE950F3F028BCAD9361CD7 /* ContextUsageViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F4E43B2DE2DCDCDC4CFED9 /* ContextUsageViews.swift */; };
+		19F8F8733C90FD5DE033960B /* PushFallbackJournal.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE42149C50F740DD45081AA7 /* PushFallbackJournal.swift */; };
 		1A249ADC123BEE86D864BF61 /* SSHTerminalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83027E8486A68D2DCA537F08 /* SSHTerminalTests.swift */; };
 		1A2564495CEE58CE46D01A5B /* SessionStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25D6AB78559D52C0802FB062 /* SessionStoreTests.swift */; };
 		1A2ABF8CC1930A0E69DA71AE /* TimelineReducer+Environment.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB8477C786979604D92BF6E0 /* TimelineReducer+Environment.swift */; };
@@ -1414,6 +1415,7 @@
 		ABDA815E97E35E9D6385A706 /* TimelineReducer.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC612EC5A949ED39D249828A /* TimelineReducer.swift */; };
 		ABF15A9A4A51D8B4D4AB2EE8 /* SessionSearchStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A4F5B1BC7B29EDD9AD85346 /* SessionSearchStoreTests.swift */; };
 		ABFDFEA8874AB28058577AC1 /* MermaidGitGraphParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C2E6841805BFA525D967F81 /* MermaidGitGraphParser.swift */; };
+		AC2121FDB965F4EE81DEBDC2 /* PushFallbackJournal.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE42149C50F740DD45081AA7 /* PushFallbackJournal.swift */; };
 		AC4BAB0D7F9C6B4610E2450E /* SugiyamaLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 579D62B4FDE02BFFB4A2E5B2 /* SugiyamaLayout.swift */; };
 		AC5512EA2AFBE4A61DC7E0B2 /* MermaidGitGraphParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C2E6841805BFA525D967F81 /* MermaidGitGraphParser.swift */; };
 		AC8A3A5303E54C982EF1A3B9 /* CommonMarkParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9AEAF8EB201B5B465E75581 /* CommonMarkParser.swift */; };
@@ -1544,6 +1546,7 @@
 		BC9A0F1C921B877D4134EC0B /* ChatSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E88FF4D6EB5757F327219A22 /* ChatSessionManager.swift */; };
 		BCC877B2D3EE7FF7C765317C /* MacSyntaxTokenText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 168668D984C8681EC49B08EE /* MacSyntaxTokenText.swift */; };
 		BCD0B036C7C4AC1F843A6DFB /* KeybindingCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8DAF5F9422543ED51545D74 /* KeybindingCatalogTests.swift */; };
+		BCD6A5100D33C1DF20156BD8 /* DiagnosticsShareButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30CD240B66190C08DF78417F /* DiagnosticsShareButton.swift */; };
 		BD124360BA6B8BBD88474811 /* ANSIParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CAF2AA157AA7A10C4E16F15 /* ANSIParserTests.swift */; };
 		BD15E4E10AE6AD0BECE4E6E9 /* MetalOrbScreenshotPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1023DAE7995BE8214EA62437 /* MetalOrbScreenshotPreview.swift */; };
 		BD1F2A2210BF71A76651472E /* SettingsTextPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A29AFAB8E368D0E865B8EB /* SettingsTextPage.swift */; };
@@ -1650,6 +1653,7 @@
 		C85B5A423917106A7BAB3BFB /* QAVerificationNegativeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5FBAE35B3DAA02D1F26E0B2 /* QAVerificationNegativeUITests.swift */; };
 		C88654E9BB42913457EA3B20 /* ConversationReplica.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EDF3C0F51B095FEE2896ACB /* ConversationReplica.swift */; };
 		C89651109E13D6FE58806727 /* MermaidGanttParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A258A67AF49D572F6ACDA472 /* MermaidGanttParser.swift */; };
+		C8B359703EA276B0037CFCE6 /* OppiNotificationService.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4AA2EB1A02F7F48FE7EC165A /* OppiNotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		C8E4998A0077B8A0B6903314 /* WebSocketClientSubscriptionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 742844DD73D5A735763825D2 /* WebSocketClientSubscriptionTests.swift */; };
 		C8FE60D5A96E038BE23507E8 /* JSONUnpairedSurrogateRepair.swift in Sources */ = {isa = PBXBuildFile; fileRef = 408FF5C27B794D214CD842EE /* JSONUnpairedSurrogateRepair.swift */; };
 		C92662C28B6E66F349E4D687 /* ChatFocusOwnershipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5798FD637A227DD071255EBD /* ChatFocusOwnershipTests.swift */; };
@@ -2135,6 +2139,13 @@
 			remoteGlobalIDString = 0787AE6D14F92203EAD13D1A;
 			remoteInfo = OppiControlWidget;
 		};
+		2157A9F54AA5D58B2EAE5784 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 719AC05877AC66A339D15A75 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A2E69274543EE6BB1DBA2606;
+			remoteInfo = OppiNotificationService;
+		};
 		604D8257A33CF21EF0FC808E /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 719AC05877AC66A339D15A75 /* Project object */;
@@ -2189,6 +2200,7 @@
 				B66CF43E5E1688A412FABD52 /* OppiActivityExtension.appex in Embed Foundation Extensions */,
 				FB5084396B1E56EAC31F2684 /* OppiControlWidget.appex in Embed Foundation Extensions */,
 				6AF5FF104141E817E12A9076 /* OppiShareExtension.appex in Embed Foundation Extensions */,
+				C8B359703EA276B0037CFCE6 /* OppiNotificationService.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2536,6 +2548,7 @@
 		3048498B81612DF39D574CDE /* HorizontalPanPassthroughScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HorizontalPanPassthroughScrollView.swift; sourceTree = "<group>"; };
 		30702BFCED948B9FDEDA2F87 /* WriteExpandScrollTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WriteExpandScrollTests.swift; sourceTree = "<group>"; };
 		30C5F0DCEBFD5781F3A254F4 /* SessionToolOutputAccessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionToolOutputAccessTests.swift; sourceTree = "<group>"; };
+		30CD240B66190C08DF78417F /* DiagnosticsShareButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsShareButton.swift; sourceTree = "<group>"; };
 		312D7E21D52B471DEFE1AFA9 /* OppiShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = OppiShareExtension.entitlements; sourceTree = "<group>"; };
 		31456ABCE06DA1891B293399 /* ServerConnectionStreamRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConnectionStreamRecoveryTests.swift; sourceTree = "<group>"; };
 		3146B02DB4E6E5D1B297D04E /* NativeMarkdownAudioView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeMarkdownAudioView.swift; sourceTree = "<group>"; };
@@ -3481,6 +3494,7 @@
 		BD06D367BA2BF53E3832D5EC /* WorkspaceFileDraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceFileDraftStore.swift; sourceTree = "<group>"; };
 		BDF3FC48464C4933B0A40EAF /* OppiControlWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = OppiControlWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		BE02A0DA4D10A4291BA38D3C /* ReadMarkdownExpandOverlapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadMarkdownExpandOverlapTests.swift; sourceTree = "<group>"; };
+		BE42149C50F740DD45081AA7 /* PushFallbackJournal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushFallbackJournal.swift; sourceTree = "<group>"; };
 		BE432AA0664DBD017C1608D4 /* MacWorkspaceCreationDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacWorkspaceCreationDraft.swift; sourceTree = "<group>"; };
 		BE6E8E35884953F2071A6799 /* FullScreenReviewCommentHarnessView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullScreenReviewCommentHarnessView.swift; sourceTree = "<group>"; };
 		BEA5B7A399DDA7C7BA1C3D5E /* ChatComposerDraftControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatComposerDraftControllerTests.swift; sourceTree = "<group>"; };
@@ -5327,6 +5341,7 @@
 			isa = PBXGroup;
 			children = (
 				331097B81B15D75B475DFE00 /* AutoTitleSettingsView.swift */,
+				30CD240B66190C08DF78417F /* DiagnosticsShareButton.swift */,
 				D7A9FC3D15AC24355BCDCD79 /* DictationDictionaryView.swift */,
 				3948E970951A00788EA9CC0B /* QuickCommentsSettingsView.swift */,
 				B7A5FA18027F3E607BD011DB /* ScopedLockToggle.swift */,
@@ -5469,6 +5484,7 @@
 		7BA589C211124EC488F1DE05 /* Push */ = {
 			isa = PBXGroup;
 			children = (
+				BE42149C50F740DD45081AA7 /* PushFallbackJournal.swift */,
 				287BAC9512DAF5F1AE762E31 /* PushSharedStore.swift */,
 			);
 			path = Push;
@@ -7176,6 +7192,7 @@
 				C4C91F1ED0ACA0B1DDCC0874 /* PBXTargetDependency */,
 				1124660CA237509C363B4B06 /* PBXTargetDependency */,
 				B833F69570C21FD393AD3A1E /* PBXTargetDependency */,
+				5B058147EC99A4D2DDA5D0C0 /* PBXTargetDependency */,
 			);
 			name = Oppi;
 			packageProductDependencies = (
@@ -7214,33 +7231,33 @@
 				LastUpgradeCheck = 2710;
 				TargetAttributes = {
 					0787AE6D14F92203EAD13D1A = {
-						DevelopmentTeam = AZAQMY4SPZ;
+						DevelopmentTeam = CVJWS3US42;
 						ProvisioningStyle = Automatic;
 					};
 					3E912506C9E99DA9C5400431 = {
 						TestTargetID = F43B4526F2243911AC8188B9;
 					};
 					894176FCBC0836E1AB8EDFA2 = {
-						DevelopmentTeam = AZAQMY4SPZ;
+						DevelopmentTeam = CVJWS3US42;
 						ProvisioningStyle = Automatic;
 					};
 					8E78B84248E9A559D2AA0C86 = {
 						TestTargetID = F43B4526F2243911AC8188B9;
 					};
 					A2E69274543EE6BB1DBA2606 = {
-						DevelopmentTeam = AZAQMY4SPZ;
+						DevelopmentTeam = CVJWS3US42;
 						ProvisioningStyle = Automatic;
 					};
 					AC87A5C07D3EED178DBB77BA = {
-						DevelopmentTeam = AZAQMY4SPZ;
+						DevelopmentTeam = CVJWS3US42;
 						ProvisioningStyle = Automatic;
 					};
 					E2B38203594BFB9F1D4D9311 = {
-						DevelopmentTeam = AZAQMY4SPZ;
+						DevelopmentTeam = CVJWS3US42;
 						ProvisioningStyle = Manual;
 					};
 					F43B4526F2243911AC8188B9 = {
-						DevelopmentTeam = AZAQMY4SPZ;
+						DevelopmentTeam = CVJWS3US42;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -7622,6 +7639,7 @@
 				59DDCBEF182F5D1399FAE27A /* NotificationService.swift in Sources */,
 				DD2DEA0B071AB4F0AF570CB0 /* PushAlertPresentation.swift in Sources */,
 				70D8427365941E8DB2D8E855 /* PushEnvelope.swift in Sources */,
+				AC2121FDB965F4EE81DEBDC2 /* PushFallbackJournal.swift in Sources */,
 				9DCE5F9938C84785EE0DD4A2 /* PushNotificationOpening.swift in Sources */,
 				560CFAF32B505028C345DB08 /* PushRegistrationSignature.swift in Sources */,
 				57738B42E9925961553157BF /* PushSharedStore.swift in Sources */,
@@ -8924,6 +8942,7 @@
 				D9E4B0B2DAA1001776C341CA /* DeviceKeyProvider.swift in Sources */,
 				6AC07E0A92F7AA727FF0EC3D /* DeviceKeyStore.swift in Sources */,
 				B23E78575B5961F8121278F3 /* DeviceResourceSampler.swift in Sources */,
+				BCD6A5100D33C1DF20156BD8 /* DiagnosticsShareButton.swift in Sources */,
 				76DE85ED184D30DAA88BA87C /* DictationComposerPolicy.swift in Sources */,
 				364CFF9FB13CE1C4F24B02DE /* DictationDictionaryConsent.swift in Sources */,
 				A7B2DDC2919F7D3D9D88451C /* DictationDictionarySelection.swift in Sources */,
@@ -9190,6 +9209,7 @@
 				4F1CBF591D031E8076F94CF3 /* ProviderIcon.swift in Sources */,
 				39CD13A56BCA993DC79189DE /* PushAlertPresentation.swift in Sources */,
 				C0FC129E6E1B93B805FE3A96 /* PushEnvelope.swift in Sources */,
+				19F8F8733C90FD5DE033960B /* PushFallbackJournal.swift in Sources */,
 				DB43E0A7DA8910FC5A9D25CD /* PushNotificationOpening.swift in Sources */,
 				DADAC68BD14513E5A1E1784D /* PushRegistration.swift in Sources */,
 				A0B85F8353D6F3C1E1411FA6 /* PushRegistrationSignature.swift in Sources */,
@@ -9609,6 +9629,11 @@
 			target = F43B4526F2243911AC8188B9 /* Oppi */;
 			targetProxy = 04DCCFDF48B1FC2B6F72718C /* PBXContainerItemProxy */;
 		};
+		5B058147EC99A4D2DDA5D0C0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A2E69274543EE6BB1DBA2606 /* OppiNotificationService */;
+			targetProxy = 2157A9F54AA5D58B2EAE5784 /* PBXContainerItemProxy */;
+		};
 		83580EA874D654FB726EB033 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = F43B4526F2243911AC8188B9 /* Oppi */;
@@ -9647,7 +9672,7 @@
 			baseConfigurationReference = 98E665F6F8280373F7FD707D /* Base.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				APP_GROUP_IDENTIFIER = group.oppi;
+				APP_GROUP_IDENTIFIER = group.no.vastveit.oppi;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -9722,7 +9747,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = dev.chenda.OppiTests;
+				PRODUCT_BUNDLE_IDENTIFIER = no.vastveit.OppiTests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Oppi.app/Oppi";
@@ -9740,7 +9765,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = dev.chenda.OppiE2ETests;
+				PRODUCT_BUNDLE_IDENTIFIER = no.vastveit.OppiE2ETests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = Oppi;
@@ -9752,8 +9777,8 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = OppiActivityExtension/OppiActivityExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 55;
-				DEVELOPMENT_TEAM = AZAQMY4SPZ;
+				CURRENT_PROJECT_VERSION = 58;
+				DEVELOPMENT_TEAM = CVJWS3US42;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = OppiActivityExtension/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Oppi;
@@ -9765,7 +9790,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.1.2;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.chenda.Oppi.ActivityExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = no.vastveit.Oppi.ActivityExtension;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -9776,8 +9801,8 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = OppiNotificationService/OppiNotificationService.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 55;
-				DEVELOPMENT_TEAM = AZAQMY4SPZ;
+				CURRENT_PROJECT_VERSION = 58;
+				DEVELOPMENT_TEAM = CVJWS3US42;
 				INFOPLIST_FILE = OppiNotificationService/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -9785,7 +9810,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.1.2;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.chenda.Oppi.NotificationService;
+				PRODUCT_BUNDLE_IDENTIFIER = no.vastveit.Oppi.NotificationService;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -9798,8 +9823,8 @@
 				CODE_SIGN_ENTITLEMENTS = Oppi/Resources/Oppi.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 55;
-				DEVELOPMENT_TEAM = AZAQMY4SPZ;
+				CURRENT_PROJECT_VERSION = 58;
+				DEVELOPMENT_TEAM = CVJWS3US42;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -9819,7 +9844,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.1.2;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.chenda.Oppi;
+				PRODUCT_BUNDLE_IDENTIFIER = no.vastveit.Oppi;
 				PRODUCT_NAME = Oppi;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -9842,7 +9867,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = dev.chenda.OppiTests;
+				PRODUCT_BUNDLE_IDENTIFIER = no.vastveit.OppiTests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Oppi.app/Oppi";
@@ -9858,7 +9883,7 @@
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 40;
-				DEVELOPMENT_TEAM = AZAQMY4SPZ;
+				DEVELOPMENT_TEAM = CVJWS3US42;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = OppiMac/Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -9867,7 +9892,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 0.2.0;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.chenda.OppiMac;
+				PRODUCT_BUNDLE_IDENTIFIER = no.vastveit.OppiMac;
 				PRODUCT_NAME = Oppi;
 				SDKROOT = macosx;
 			};
@@ -9880,8 +9905,8 @@
 				CODE_SIGN_ENTITLEMENTS = Oppi/Resources/Oppi.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 55;
-				DEVELOPMENT_TEAM = AZAQMY4SPZ;
+				CURRENT_PROJECT_VERSION = 58;
+				DEVELOPMENT_TEAM = CVJWS3US42;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				EXCLUDED_SOURCE_FILE_NAMES = "suzanne-garden.usdz";
 				FRAMEWORK_SEARCH_PATHS = (
@@ -9902,7 +9927,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.1.2;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.chenda.Oppi;
+				PRODUCT_BUNDLE_IDENTIFIER = no.vastveit.Oppi;
 				PRODUCT_NAME = Oppi;
 				SDKROOT = iphoneos;
 				SWIFT_OPTIMIZATION_LEVEL = "-Osize";
@@ -9916,8 +9941,8 @@
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
 				CODE_SIGN_ENTITLEMENTS = OppiControlWidget/OppiControlWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 55;
-				DEVELOPMENT_TEAM = AZAQMY4SPZ;
+				CURRENT_PROJECT_VERSION = 58;
+				DEVELOPMENT_TEAM = CVJWS3US42;
 				INFOPLIST_FILE = OppiControlWidget/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -9925,7 +9950,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.1.2;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.chenda.Oppi.ControlWidget;
+				PRODUCT_BUNDLE_IDENTIFIER = no.vastveit.Oppi.ControlWidget;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -9942,7 +9967,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = dev.chenda.OppiPerfTests;
+				PRODUCT_BUNDLE_IDENTIFIER = no.vastveit.OppiPerfTests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Oppi.app/Oppi";
@@ -9954,8 +9979,8 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = OppiShareExtension/OppiShareExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 55;
-				DEVELOPMENT_TEAM = AZAQMY4SPZ;
+				CURRENT_PROJECT_VERSION = 58;
+				DEVELOPMENT_TEAM = CVJWS3US42;
 				INFOPLIST_FILE = OppiShareExtension/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -9963,7 +9988,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.1.2;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.chenda.Oppi.ShareExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = no.vastveit.Oppi.ShareExtension;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -9974,8 +9999,8 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = OppiShareExtension/OppiShareExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 55;
-				DEVELOPMENT_TEAM = AZAQMY4SPZ;
+				CURRENT_PROJECT_VERSION = 58;
+				DEVELOPMENT_TEAM = CVJWS3US42;
 				INFOPLIST_FILE = OppiShareExtension/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -9983,7 +10008,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.1.2;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.chenda.Oppi.ShareExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = no.vastveit.Oppi.ShareExtension;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -10000,7 +10025,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = dev.chenda.OppiUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = no.vastveit.OppiUITests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = Oppi;
@@ -10012,7 +10037,7 @@
 			baseConfigurationReference = 98E665F6F8280373F7FD707D /* Base.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				APP_GROUP_IDENTIFIER = group.oppi;
+				APP_GROUP_IDENTIFIER = group.no.vastveit.oppi;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -10084,8 +10109,8 @@
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
 				CODE_SIGN_ENTITLEMENTS = OppiControlWidget/OppiControlWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 55;
-				DEVELOPMENT_TEAM = AZAQMY4SPZ;
+				CURRENT_PROJECT_VERSION = 58;
+				DEVELOPMENT_TEAM = CVJWS3US42;
 				INFOPLIST_FILE = OppiControlWidget/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -10093,7 +10118,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.1.2;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.chenda.Oppi.ControlWidget;
+				PRODUCT_BUNDLE_IDENTIFIER = no.vastveit.Oppi.ControlWidget;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -10112,7 +10137,7 @@
 					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.chenda.OppiMacTests;
+				PRODUCT_BUNDLE_IDENTIFIER = no.vastveit.OppiMacTests;
 				SDKROOT = macosx;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Oppi.app/Contents/MacOS/Oppi";
 			};
@@ -10131,7 +10156,7 @@
 					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.chenda.OppiMacTests;
+				PRODUCT_BUNDLE_IDENTIFIER = no.vastveit.OppiMacTests;
 				SDKROOT = macosx;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Oppi.app/Contents/MacOS/Oppi";
 			};
@@ -10148,7 +10173,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = dev.chenda.OppiE2ETests;
+				PRODUCT_BUNDLE_IDENTIFIER = no.vastveit.OppiE2ETests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = Oppi;
@@ -10160,8 +10185,8 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = OppiNotificationService/OppiNotificationService.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 55;
-				DEVELOPMENT_TEAM = AZAQMY4SPZ;
+				CURRENT_PROJECT_VERSION = 58;
+				DEVELOPMENT_TEAM = CVJWS3US42;
 				INFOPLIST_FILE = OppiNotificationService/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -10169,7 +10194,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.1.2;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.chenda.Oppi.NotificationService;
+				PRODUCT_BUNDLE_IDENTIFIER = no.vastveit.Oppi.NotificationService;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -10180,8 +10205,8 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = OppiActivityExtension/OppiActivityExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 55;
-				DEVELOPMENT_TEAM = AZAQMY4SPZ;
+				CURRENT_PROJECT_VERSION = 58;
+				DEVELOPMENT_TEAM = CVJWS3US42;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = OppiActivityExtension/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Oppi;
@@ -10193,7 +10218,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.1.2;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.chenda.Oppi.ActivityExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = no.vastveit.Oppi.ActivityExtension;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -10209,7 +10234,7 @@
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 40;
-				DEVELOPMENT_TEAM = AZAQMY4SPZ;
+				DEVELOPMENT_TEAM = CVJWS3US42;
 				ENABLE_HARDENED_RUNTIME = NO;
 				INFOPLIST_FILE = OppiMac/Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -10218,7 +10243,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 0.2.0;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.chenda.OppiMac;
+				PRODUCT_BUNDLE_IDENTIFIER = no.vastveit.OppiMac;
 				PRODUCT_NAME = Oppi;
 				SDKROOT = macosx;
 			};
@@ -10235,7 +10260,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = dev.chenda.OppiPerfTests;
+				PRODUCT_BUNDLE_IDENTIFIER = no.vastveit.OppiPerfTests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Oppi.app/Oppi";
@@ -10253,7 +10278,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = dev.chenda.OppiUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = no.vastveit.OppiUITests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = Oppi;

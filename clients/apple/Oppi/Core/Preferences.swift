@@ -349,6 +349,13 @@ enum AppPreferences {
                 return PreferredWorkspaceSelection(id: explicitDefault, source: "default")
             }
 
+            if let home = workspaces.first(where: {
+                $0.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                    .caseInsensitiveCompare("Home") == .orderedSame
+            }) {
+                return PreferredWorkspaceSelection(id: home.id, source: "home")
+            }
+
             return PreferredWorkspaceSelection(id: workspaces[0].id, source: "first_available")
         }
 

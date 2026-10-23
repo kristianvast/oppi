@@ -193,6 +193,10 @@ extension ServerConnection {
         let previousWorkspaceId = previousSession?.workspaceId
         sessionStore.applySummary(normalized)
         if let currentSession = sessionStore.session(id: normalized.id) {
+            if currentSession.programStatus?.state == .blocked,
+               previousSession?.programStatus?.state != .blocked {
+                PushRegistration.clearPromptDismissalOnAttentionIfNeeded(serverId: currentServerId)
+            }
             notifySessionDoneIfEntered(previous: previousSession, current: currentSession)
         }
         if let previousWorkspaceId, previousWorkspaceId != normalized.workspaceId {

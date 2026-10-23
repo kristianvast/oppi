@@ -86,8 +86,29 @@ enum SessionListPresentation {
         SessionStatusKind.resolve(session: session, pendingAskCount: attention.askCount, seenAt: nil).isBlocked
     }
 
-    /// Your Turn order: blocked first, then the oldest visible activity, the
-    /// same timestamp the row shows.
+    /// Whether the session is a live connected terminal mirror.
+    static func isLiveMirror(_ session: Session) -> Bool {
+        session.runtime == .piTui && session.mirror?.status == "connected"
+    }
+
+    /// Whether the session belongs to the Home workspace (or has a home-dir mirror cwd).
+    static func isHomeSession(_ session: Session) -> Bool {
+        if let wsName = session.workspaceName?.trimmingCharacters(in: .whitespacesAndNewlines),
+           wsName.caseInsensitiveCompare("Home") == .orderedSame {
+            return true
+        }
+        return false
+    }
+
+    /// Priority rank for a live mirrored session: Home workspace live mirrors rank highest (2),
+    /// other live mirrors rank next (1), non-live/managed rank 0.
+    static func liveMirrorRank(_ session: Session) -> Int {
+        guard isLiveMirror(session) else { return 0 }
+        return isHomeSession(session) ? 2 : 1
+    }
+
+    /// Your Turn order: blocked first, then live mirrored sessions (Home first),
+    /// then the oldest visible activity, the same timestamp the row shows.
     static func compareYourTurn(
         _ lhs: Session,
         lhsBlocked: Bool,
@@ -95,6 +116,10 @@ enum SessionListPresentation {
         rhsBlocked: Bool
     ) -> Bool {
         if lhsBlocked != rhsBlocked { return lhsBlocked }
+
+        let lhsMirror = liveMirrorRank(lhs)
+        let rhsMirror = liveMirrorRank(rhs)
+        if lhsMirror != rhsMirror { return lhsMirror > rhsMirror }
 
         if lhs.lastActivity != rhs.lastActivity { return lhs.lastActivity < rhs.lastActivity }
         if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
@@ -108,6 +133,10 @@ enum SessionListPresentation {
     }
 
     static func compareWorking(_ lhs: Session, _ rhs: Session) -> Bool {
+        let lhsMirror = liveMirrorRank(lhs)
+        let rhsMirror = liveMirrorRank(rhs)
+        if lhsMirror != rhsMirror { return lhsMirror > rhsMirror }
+
         if lhs.createdAt != rhs.createdAt { return lhs.createdAt > rhs.createdAt }
         if lhs.lastActivity != rhs.lastActivity { return lhs.lastActivity > rhs.lastActivity }
         return lhs.id < rhs.id

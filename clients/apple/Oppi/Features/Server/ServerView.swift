@@ -21,7 +21,7 @@ struct ServerView: View {
     @State private var dailyDetailCache: [String: DailyDetail] = [:]
     @State private var selectedMetric: StatsMetric = .cost
     @State private var showAddServer = false
-    @State private var providerStatuses: [ProviderAuthProviderStatus] = []
+    @State private var providerSetupState: ProviderSetupState = .unknown
 
     /// Follows the pill's selected host.
     private var selectedServer: PairedServer? {
@@ -164,7 +164,7 @@ struct ServerView: View {
     // MARK: - Provider Setup
 
     private var shouldShowProviderSetupCard: Bool {
-        !providerStatuses.isEmpty && !providerStatuses.contains(where: \.authenticated)
+        ProviderSetupPromptPolicy.shouldShow(for: providerSetupState)
     }
 
     private func providerSetupCard(for server: PairedServer) -> some View {
@@ -263,7 +263,7 @@ struct ServerView: View {
 
     private func clearServerState() {
         serverInfo = nil
-        providerStatuses = []
+        providerSetupState = .unknown
     }
 
     private func clearStatsState() {
@@ -333,14 +333,38 @@ struct ServerView: View {
         let requestedId = server.id
         guard let client = await apiClient(for: server) else { return }
 
+        async let statusesTask = client.listProviderAuthStatus()
+        async let modelsTask: [ModelInfo]? = try? await client.listModels()
+
         do {
-            let statuses = try await client.listProviderAuthStatus()
+            let statuses = try await statusesTask
+            let models = await modelsTask
             guard shouldApplyHostResult(requestedId: requestedId) else { return }
-            providerStatuses = statuses
+            let connection = coordinator.connection(for: requestedId)
+            if let models, let connection {
+                connection.chatState.cachedModels = models
+                connection.chatState.modelsCacheReady = true
+            }
+            let modelCount = models?.count
+                ?? serverInfo?.stats.modelCount
+                ?? connection?.chatState.cachedModels.count
+                ?? 0
+            let hasExternalTerminalLauncher = connection?.sessionStore.listProjectionSessions.contains {
+                $0.runtime == .piTui
+            } ?? false
+            providerSetupState = ProviderSetupState(
+                providerStatuses: statuses,
+                authenticatedModelCount: modelCount,
+                hasExternalTerminalLauncher: hasExternalTerminalLauncher
+            )
         } catch {
             guard shouldApplyHostResult(requestedId: requestedId, error: error) else { return }
-            // Non-fatal — the dashboard can still show stats without setup status.
-            providerStatuses = []
+            if let models = await modelsTask, !models.isEmpty {
+                providerSetupState = .configured
+            } else {
+                // Non-fatal — the dashboard can still show stats without setup status.
+                providerSetupState = .unavailable
+            }
         }
     }
 

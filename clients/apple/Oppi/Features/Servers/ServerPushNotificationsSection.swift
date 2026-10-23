@@ -11,6 +11,7 @@ struct ServerPushNotificationsSection: View {
     @State private var isEnabled = false
     @State private var showDisclosure = false
     @State private var status: Status = .idle
+    @State private var errorMessage: String?
 
     enum Status: Equatable {
         case idle
@@ -45,7 +46,7 @@ struct ServerPushNotificationsSection: View {
                         .accessibilityIdentifier("server.push.working")
                 }
                 if status == .failed {
-                    Text("Couldn't turn on push. Check that notifications are allowed for Oppi, then try again.")
+                    Text(errorMessage ?? "Couldn't turn on push. Check that notifications are allowed for Oppi, then try again.")
                         .foregroundStyle(.themeOrange)
                         .accessibilityIdentifier("server.push.error")
                 }
@@ -53,6 +54,11 @@ struct ServerPushNotificationsSection: View {
                 Text(Self.footer(relayHost: relayHost, appAttestSupported: DCAppAttestService.shared.isSupported))
             }
             .onAppear { isEnabled = PushRegistration.isEnabled(serverId: serverId) }
+            .onReceive(NotificationCenter.default.publisher(for: PushRegistration.stateDidChangeNotification)) { _ in
+                if status != .working {
+                    isEnabled = PushRegistration.isEnabled(serverId: serverId)
+                }
+            }
             .alert("Turn On Push Notifications?", isPresented: $showDisclosure) {
                 Button("Turn On") { turnOn() }
                 Button("Cancel", role: .cancel) {}
@@ -73,26 +79,18 @@ struct ServerPushNotificationsSection: View {
     }
 
     private func turnOn() {
-        guard let connection, let relay = connection.pushRelay, let api = connection.apiClient,
-              let deviceId = connection.credentials?.deviceCredential?.deviceId else {
-            status = .failed
-            return
-        }
-        PushRegistration.setEnabled(true, serverId: serverId)
         isEnabled = true
+        errorMessage = nil
         status = .working
         Task {
-            let registered = await PushRegistration.shared.register(
-                api: api,
-                serverId: serverId,
-                deviceId: deviceId,
-                relay: relay
-            )
-            if registered {
+            switch await PushRegistration.shared.turnOn(serverId: serverId, connection: connection) {
+            case .success:
+                isEnabled = true
+                errorMessage = nil
                 status = .idle
-            } else {
-                PushRegistration.setEnabled(false, serverId: serverId)
+            case .failure(let error):
                 isEnabled = false
+                errorMessage = error.errorDescription
                 status = .failed
             }
         }

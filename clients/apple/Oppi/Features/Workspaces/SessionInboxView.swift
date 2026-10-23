@@ -399,6 +399,13 @@ struct SessionInboxView: View {
         let data = viewData
 
         List {
+            if let selectedServer {
+                SessionListPushPromptSection(
+                    serverId: selectedServer.id,
+                    connection: activeConnection
+                )
+            }
+
             if showsMinimumServerVersionNotice, let selectedServer {
                 ProviderSetupPromptListSection {
                     ServerVersionPromptCard {
@@ -783,13 +790,46 @@ struct SessionInboxView: View {
             return
         }
 
+        async let statusesTask = client.listProviderAuthStatus()
+        async let modelsTask: [ModelInfo]? = try? await client.listModels()
+
         do {
-            let statuses = try await client.listProviderAuthStatus()
+            let statuses = try await statusesTask
+            let models = await modelsTask
             guard requestedServerId == coordinator.activeServerId else { return }
-            providerSetupState = ProviderSetupState(providerStatuses: statuses)
+            let connection = coordinator.connection(for: requestedServerId)
+            if let models, let connection {
+                connection.chatState.cachedModels = models
+                connection.chatState.modelsCacheReady = true
+            }
+            let modelCount = models?.count
+                ?? connection?.chatState.cachedModels.count
+                ?? 0
+            let hasExternalTerminalLauncher = connection?.sessionStore.listProjectionSessions.contains {
+                $0.runtime == .piTui
+            } ?? false
+            providerSetupState = ProviderSetupState(
+                providerStatuses: statuses,
+                authenticatedModelCount: modelCount,
+                hasExternalTerminalLauncher: hasExternalTerminalLauncher
+            )
         } catch {
             guard requestedServerId == coordinator.activeServerId else { return }
-            providerSetupState = .unavailable
+            let connection = coordinator.connection(for: requestedServerId)
+            let hasExternalTerminalLauncher = connection?.sessionStore.listProjectionSessions.contains {
+                $0.runtime == .piTui
+            } ?? false
+            if let models = await modelsTask, !models.isEmpty {
+                if let connection {
+                    connection.chatState.cachedModels = models
+                    connection.chatState.modelsCacheReady = true
+                }
+                providerSetupState = .configured
+            } else if hasExternalTerminalLauncher {
+                providerSetupState = .configured
+            } else {
+                providerSetupState = .unavailable
+            }
         }
     }
 

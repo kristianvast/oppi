@@ -109,6 +109,64 @@ struct SessionStatusPresentationTests {
         #expect(status != .working)
     }
 
+    @Test func readyMirroredSessionWithBackgroundActivityWorkingMessageResolvesWorkingAndSurfacesMessage() {
+        var mirrored = session(
+            .ready,
+            program: ProgramStatus(
+                state: .working,
+                message: "Waiting on 3 background activities",
+                since: outcomeSince
+            )
+        )
+        mirrored.runtime = .piTui
+        mirrored.name = "Home omo"
+
+        #expect(SessionStatusKind.resolve(session: mirrored, seenAt: seenAfter) == .working)
+        #expect(SessionStatusKind.workingMessage(for: mirrored) == "Waiting on 3 background activities")
+        #expect(SessionListPresentation.activeSectionKind(for: mirrored) == .working)
+
+        let rowPresentation = SessionRowPresentationBuilder.make(session: mirrored)
+        #expect(rowPresentation.statusKind == .working)
+        #expect(rowPresentation.workingMessage == "Waiting on 3 background activities")
+
+        let grouped = SessionInboxGrouping.make(
+            items: [mirrored],
+            now: outcomeSince,
+            calendar: Calendar(identifier: .gregorian),
+            session: { $0 },
+            attention: { _ in .none }
+        )
+        #expect(grouped.working.map(\.id) == [mirrored.id])
+        #expect(grouped.yourTurn.isEmpty)
+
+        let titleView = ChatSessionTitleView(
+            sessionId: mirrored.id,
+            sessionDisplayName: mirrored.displayTitle,
+            assistantIdentityPresentation: .globalAvatar,
+            agentIcon: nil,
+            cost: nil,
+            terminalMirrorIndicator: TerminalMirrorIndicatorPresentation(session: mirrored),
+            maxWidth: 240,
+            workingMessage: SessionStatusKind.workingMessage(for: mirrored)
+        )
+        #expect(titleView.workingMessage == "Waiting on 3 background activities")
+    }
+
+    @Test func workingMessageOmitsRedundantSessionTitle() {
+        var busy = session(
+            .busy,
+            program: ProgramStatus(
+                state: .working,
+                message: "Session test-session",
+                since: outcomeSince
+            )
+        )
+        busy.name = "Session test-session"
+
+        #expect(SessionStatusKind.resolve(session: busy, seenAt: nil) == .working)
+        #expect(SessionStatusKind.workingMessage(for: busy) == nil)
+    }
+
     @Test func aStoppedSessionIsNeverWorkingOrBlocked() {
         for state in [ProgramStatusState.working, .blocked] {
             let stopped = session(.stopped, program: program(state, kind: .permission))

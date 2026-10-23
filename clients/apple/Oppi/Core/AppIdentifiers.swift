@@ -26,7 +26,7 @@ enum ReleaseFeatures {
     /// Remote push: the Server Settings opt-in and APNs/relay registration. Keep hidden
     /// until the build carries the `aps-environment` entitlement and embeds
     /// `OppiNotificationService`; without them registration can only fail.
-    static let pushNotificationsEnabled = false
+    static let pushNotificationsEnabled = true
 
     /// Live Activity codepath availability (runtime opt-in handled by
     /// `AppPreferences.LiveActivity`).

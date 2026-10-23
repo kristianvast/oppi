@@ -33,6 +33,14 @@ func sortedWorkspacesForList(
             return lhsLatest > rhsLatest
         }
 
+        let lhsIsHome = lhs.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            .caseInsensitiveCompare("Home") == .orderedSame
+        let rhsIsHome = rhs.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            .caseInsensitiveCompare("Home") == .orderedSame
+        if lhsIsHome != rhsIsHome {
+            return lhsIsHome
+        }
+
         let nameOrder = lhs.name.localizedCaseInsensitiveCompare(rhs.name)
         if nameOrder != .orderedSame {
             return nameOrder == .orderedAscending

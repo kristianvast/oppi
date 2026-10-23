@@ -187,15 +187,33 @@ final class ServerSettingsModel {
     }
 
     private func loadProviderSummary(_ client: Client) async {
+        async let statusesTask = client.api.listProviderAuthStatus()
+        async let modelsTask: [ModelInfo]? = try? await client.api.listModels()
+
         do {
-            let statuses = try await client.api.listProviderAuthStatus()
+            let statuses = try await statusesTask
+            let models = await modelsTask
             guard shouldApply(client.serverId) else { return }
-            providerSetupState = ProviderSetupState(providerStatuses: statuses)
-            connectedProviderCount = statuses.filter(\.authenticated).count
+            let modelCount = models?.count ?? info?.stats.modelCount ?? 0
+            let hasExternalTerminalLauncher = coordinator?.connection(for: client.serverId)?
+                .sessionStore.listProjectionSessions.contains { $0.runtime == .piTui } ?? false
+            providerSetupState = ProviderSetupState(
+                providerStatuses: statuses,
+                authenticatedModelCount: modelCount,
+                hasExternalTerminalLauncher: hasExternalTerminalLauncher
+            )
+            let authenticatedProviders = statuses.filter(\.authenticated).count
+            let distinctModelProviders = Set((models ?? []).map(\.provider)).count
+            connectedProviderCount = max(authenticatedProviders, distinctModelProviders)
         } catch {
             guard shouldApply(client.serverId, error: error) else { return }
-            providerSetupState = .unavailable
-            connectedProviderCount = 0
+            if let models = await modelsTask, !models.isEmpty {
+                providerSetupState = .configured
+                connectedProviderCount = max(1, Set(models.map(\.provider)).count)
+            } else {
+                providerSetupState = .unavailable
+                connectedProviderCount = 0
+            }
         }
     }
 

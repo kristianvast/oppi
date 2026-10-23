@@ -9,7 +9,7 @@ enum SharedConstants {
     ///
     /// Must match `APP_GROUP_IDENTIFIER` in project.yml and the
     /// `com.apple.security.application-groups` entitlement in both targets.
-    static let appGroupIdentifier = "group.oppi"
+    static let appGroupIdentifier = "group.no.vastveit.oppi"
 
     /// Shared UserDefaults suite for data visible to both app and extensions.
     static var sharedDefaults: UserDefaults {

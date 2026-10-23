@@ -1099,7 +1099,12 @@ private struct SessionThreadDetailContentView: View {
         }
         let time = session.lastActivity.formatted(date: .omitted, time: .shortened)
         switch status {
-        case .working: parts.append("working")
+        case .working:
+            if !hidesDetails, let message = SessionStatusKind.workingMessage(for: session) {
+                parts.append(message)
+            } else {
+                parts.append("working")
+            }
         case .needsApproval, .question, .signIn: parts.append("\(status.label.lowercased()) since \(time)")
         case .error: parts.append("failed \(time)")
         case .done: parts.append("done \(time)")

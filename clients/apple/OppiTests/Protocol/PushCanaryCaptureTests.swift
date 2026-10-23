@@ -75,13 +75,13 @@ struct PushCanaryCaptureTests {
                     now: now,
                     key: { $0 == keyId ? material : nil },
                     acceptMessage: { messageId, keyId in
-                        PushSharedStore.acceptMessage(
+                        PushSharedStore.checkMessage(
                             messageId,
                             keyId: keyId,
                             now: now,
                             ledgerURL: ledger,
                             liveKeyIds: { [keyId.base64URLEncodedString] }
-                        )
+                        ) == .accepted
                     }
                 ),
                 redaction: { PushRedactionSnapshot(appLockEnabled: false, lockedScopes: []) }

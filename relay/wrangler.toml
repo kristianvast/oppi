@@ -3,6 +3,7 @@
 name = "oppi-push-relay"
 main = "src/cloudflare/worker.ts"
 compatibility_date = "2026-10-01"
+routes = [{ pattern = "push.agrointelserver.no", custom_domain = true }]
 
 # The relay keeps no request logs: Workers Logs and invocation logs (method and URL) stay off.
 [observability]
@@ -25,5 +26,5 @@ tag = "v1"
 new_sqlite_classes = ["RegistrationObject", "ChallengeObject"]
 
 [vars]
-APP_ID = "AZAQMY4SPZ.dev.chenda.Oppi"
-BUNDLE_ID = "dev.chenda.Oppi"
+APP_ID = "CVJWS3US42.no.vastveit.Oppi"
+BUNDLE_ID = "no.vastveit.Oppi"

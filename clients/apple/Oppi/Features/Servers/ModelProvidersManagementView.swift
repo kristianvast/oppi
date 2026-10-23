@@ -824,10 +824,24 @@ struct ModelProvidersManagementView: View {
         }
 
         async let quotas = loadProviderQuotas(api: client)
+        async let modelsTask: [ModelInfo]? = try? await client.listModels()
 
         do {
             providerStatuses = try await client.listProviderAuthStatus()
-            providerSetupState = ProviderSetupState(providerStatuses: providerStatuses)
+            let models = await modelsTask
+            let connection = coordinator.connection(for: pairedServer.id)
+            if let models, let connection {
+                connection.chatState.cachedModels = models
+                connection.chatState.modelsCacheReady = true
+            }
+            let hasExternalTerminalLauncher = connection?.sessionStore.listProjectionSessions.contains {
+                $0.runtime == .piTui
+            } ?? false
+            providerSetupState = ProviderSetupState(
+                providerStatuses: providerStatuses,
+                authenticatedModelCount: models?.count ?? 0,
+                hasExternalTerminalLauncher: hasExternalTerminalLauncher
+            )
             providerError = nil
         } catch {
             providerStatuses = []

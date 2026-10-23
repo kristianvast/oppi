@@ -132,38 +132,79 @@ enum PushSharedStore {
         return snapshot
     }
 
+    // MARK: Fallback journal
+
+    static func recordFallback(reason: String, detail: String?, now: Date) {
+        do {
+            let url = try stateDirectory().appendingPathComponent("fallbacks.json")
+            try PushFallbackJournal.append(PushFallbackRecord(at: now, reason: reason, detail: detail), to: url)
+        } catch {
+            let nsError = error as NSError
+            logger.error(
+                "Push fallback not recorded (\(nsError.domain, privacy: .public) \(nsError.code, privacy: .public))"
+            )
+        }
+    }
+
+    static func drainFallbacks() -> [PushFallbackRecord] {
+        guard let url = try? stateDirectory().appendingPathComponent("fallbacks.json") else { return [] }
+        return PushFallbackJournal.drain(url)
+    }
+
     // MARK: Replay ledger
 
-    /// Record a push's message id for `keyId` (spec §2.5 step 7). False for a replay, or when
-    /// the ledger cannot be locked or saved.
-    static func acceptMessage(_ messageId: Data, keyId: Data, now: Date) -> Bool {
+    /// Outcome of the replay check. Anything but `accepted` shows the fallback; the
+    /// unavailable cases say why, so a broken ledger is not reported as a replay.
+    enum ReplayCheck: Equatable, Sendable {
+        case accepted
+        case replay
+        case ledgerUnavailable(String)
+        case ledgerNotSaved(String)
+
+        var failureDetail: String? {
+            switch self {
+            case .accepted, .replay: nil
+            case .ledgerUnavailable(let detail), .ledgerNotSaved(let detail): detail
+            }
+        }
+    }
+
+    /// Record a push's message id for `keyId` (spec §2.5 step 7).
+    static func checkMessage(_ messageId: Data, keyId: Data, now: Date) -> ReplayCheck {
         guard let directory = try? stateDirectory(),
               let container = try? CrossProcessFileLock.appGroupContainer(
                 identifier: SharedConstants.appGroupIdentifier
               ) else {
             logger.error("Push replay ledger unavailable; showing the fallback")
-            return false
+            return .ledgerUnavailable("appGroup")
         }
-        let accepted = try? CrossProcessFileLock.withLock(serverId: "push-replay", container: container) {
-            acceptMessage(
-                messageId,
-                keyId: keyId,
-                now: now,
-                ledgerURL: directory.appendingPathComponent("replay.json"),
-                liveKeyIds: { Set(allKeys().compactMap { try? $0.keyId.base64URLEncodedString }) }
-            )
+        do {
+            return try CrossProcessFileLock.withLock(serverId: "push-replay", container: container) {
+                checkMessage(
+                    messageId,
+                    keyId: keyId,
+                    now: now,
+                    ledgerURL: directory.appendingPathComponent("replay.json"),
+                    liveKeyIds: { Set(allKeys().compactMap { try? $0.keyId.base64URLEncodedString }) }
+                )
+            }
+        } catch CrossProcessFileLock.LockError.openFailed(let code) {
+            logger.error("Push replay lock not opened (errno \(code, privacy: .public)); showing the fallback")
+            return .ledgerUnavailable("lockOpenFailed errno=\(code)")
+        } catch {
+            logger.error("Push replay lock not acquired; showing the fallback")
+            return .ledgerUnavailable("lockFailed")
         }
-        return accepted ?? false
     }
 
     /// The ledger read-modify-write; the caller holds the cross-process lock.
-    static func acceptMessage(
+    static func checkMessage(
         _ messageId: Data,
         keyId: Data,
         now: Date,
         ledgerURL url: URL,
         liveKeyIds: () -> Set<String>
-    ) -> Bool {
+    ) -> ReplayCheck {
         var ledger = PushReplayLedger()
         if FileManager.default.fileExists(atPath: url.path) {
             do {
@@ -178,18 +219,18 @@ enum PushSharedStore {
                 )
             }
         }
-        guard ledger.accept(messageId: messageId, keyId: keyId, now: now) else { return false }
+        guard ledger.accept(messageId: messageId, keyId: keyId, now: now) else { return .replay }
         // Entries for deleted keys go with them.
         ledger.retainKeys(liveKeyIds().union([keyId.base64URLEncodedString]))
         do {
             try write(JSONEncoder().encode(ledger), to: url)
-            return true
+            return .accepted
         } catch {
             let nsError = error as NSError
             logger.error(
                 "Push replay ledger not saved (\(nsError.domain, privacy: .public) \(nsError.code, privacy: .public)); showing the fallback"
             )
-            return false
+            return .ledgerNotSaved("\(nsError.domain) \(nsError.code)")
         }
     }
 }

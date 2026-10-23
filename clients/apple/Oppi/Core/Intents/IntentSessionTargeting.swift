@@ -32,14 +32,23 @@ enum IntentSessionRanking {
         let fallbackDefault = defaultId.flatMap {
             present.contains($0) && $0 != lastUsed ? $0 : nil
         }
+        let homeDefault: String? = fallbackDefault == nil
+            ? items.first(where: {
+                let candidateId = id($0)
+                guard candidateId != lastUsed else { return false }
+                return name($0).trimmingCharacters(in: .whitespacesAndNewlines)
+                    .caseInsensitiveCompare("Home") == .orderedSame
+            }).map(id)
+            : nil
+        let effectiveDefault = fallbackDefault ?? homeDefault
 
         return items.sorted { lhs, rhs in
             let leftId = id(lhs)
             let rightId = id(rhs)
             if leftId == lastUsed, rightId != lastUsed { return true }
             if rightId == lastUsed, leftId != lastUsed { return false }
-            if leftId == fallbackDefault, rightId != fallbackDefault { return true }
-            if rightId == fallbackDefault, leftId != fallbackDefault { return false }
+            if leftId == effectiveDefault, rightId != effectiveDefault { return true }
+            if rightId == effectiveDefault, leftId != effectiveDefault { return false }
             return name(lhs).localizedCaseInsensitiveCompare(name(rhs)) == .orderedAscending
         }
     }

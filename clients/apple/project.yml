@@ -71,7 +71,7 @@ packages:
     from: "0.15.0"
 
 options:
-  bundleIdPrefix: dev.chenda
+  bundleIdPrefix: no.vastveit
   deploymentTarget:
     iOS: "26.0"
     macOS: "15.0"
@@ -90,7 +90,7 @@ settings:
     INFOPLIST_KEY_UILaunchScreen_Generation: true
     ENABLE_USER_SCRIPT_SANDBOXING: true
     OPPI_TELEMETRY_MODE: "internal"
-    APP_GROUP_IDENTIFIER: group.oppi
+    APP_GROUP_IDENTIFIER: group.no.vastveit.oppi
     DEBUG_INFORMATION_FORMAT: "dwarf-with-dsym"
   configs:
     Release:
@@ -119,13 +119,13 @@ targets:
           - "Renderers/Orbs/LICENSE"
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.chenda.Oppi
+        PRODUCT_BUNDLE_IDENTIFIER: no.vastveit.Oppi
         PRODUCT_NAME: Oppi
         MARKETING_VERSION: "1.1.2"
-        CURRENT_PROJECT_VERSION: 55
+        CURRENT_PROJECT_VERSION: 58
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: AZAQMY4SPZ
+        DEVELOPMENT_TEAM: CVJWS3US42
         INFOPLIST_KEY_NSSupportsLiveActivities: true
         ENABLE_USER_SCRIPT_SANDBOXING: false
         INFOPLIST_PREPROCESS: YES
@@ -151,6 +151,8 @@ targets:
         # keep-alive) can still write new files after lock. Stores that set a
         # class explicitly use the same one. See LocalDataProtection.swift.
         com.apple.developer.default-data-protection: NSFileProtectionCompleteUnlessOpen
+        aps-environment: production
+        com.apple.developer.devicecheck.appattest-environment: production
     info:
       path: Oppi/Resources/Info.plist
       properties:
@@ -203,7 +205,7 @@ targets:
         # Expanded by scripts/stamp-git-commit.sh via INFOPLIST_PREFIX_HEADER.
         OPPIGitCommit: OPPI_GIT_COMMIT_VALUE
         NSAppTransportSecurity:
-          NSAllowsLocalNetworking: true
+          NSAllowsArbitraryLoads: true
     preBuildScripts:
       - script: |
           "$SRCROOT/scripts/stamp-git-commit.sh"
@@ -376,6 +378,8 @@ targets:
         embed: true
       - target: OppiShareExtension
         embed: true
+      - target: OppiNotificationService
+        embed: true
 
   OppiActivityExtension:
     type: app-extension
@@ -409,11 +413,11 @@ targets:
           - $(APP_GROUP_IDENTIFIER)
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.chenda.Oppi.ActivityExtension
+        PRODUCT_BUNDLE_IDENTIFIER: no.vastveit.Oppi.ActivityExtension
         MARKETING_VERSION: "1.1.2"
-        CURRENT_PROJECT_VERSION: 55
+        CURRENT_PROJECT_VERSION: 58
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: AZAQMY4SPZ
+        DEVELOPMENT_TEAM: CVJWS3US42
         GENERATE_INFOPLIST_FILE: true
         INFOPLIST_KEY_CFBundleDisplayName: Oppi
         INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.widgetkit-extension
@@ -472,7 +476,7 @@ targets:
         NSLocalNetworkUsageDescription: "Oppi needs local network access to start a shared Quick Session on your paired server."
         NSFaceIDUsageDescription: "Oppi uses Face ID to confirm sharing to a session when App Lock is on."
         NSAppTransportSecurity:
-          NSAllowsLocalNetworking: true
+          NSAllowsArbitraryLoads: true
         NSExtension:
           NSExtensionPointIdentifier: com.apple.share-services
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
@@ -486,11 +490,11 @@ targets:
               NSExtensionActivationSupportsFileWithMaxCount: 10
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.chenda.Oppi.ShareExtension
+        PRODUCT_BUNDLE_IDENTIFIER: no.vastveit.Oppi.ShareExtension
         MARKETING_VERSION: "1.1.2"
-        CURRENT_PROJECT_VERSION: 55
+        CURRENT_PROJECT_VERSION: 58
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: AZAQMY4SPZ
+        DEVELOPMENT_TEAM: CVJWS3US42
 
   OppiControlWidget:
     type: app-extension
@@ -535,11 +539,11 @@ targets:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.chenda.Oppi.ControlWidget
+        PRODUCT_BUNDLE_IDENTIFIER: no.vastveit.Oppi.ControlWidget
         MARKETING_VERSION: "1.1.2"
-        CURRENT_PROJECT_VERSION: 55
+        CURRENT_PROJECT_VERSION: 58
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: AZAQMY4SPZ
+        DEVELOPMENT_TEAM: CVJWS3US42
         CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION: "YES"
 
   # Opens end-to-end-encrypted pushes (protocol/push/spec.md). Not embedded in Oppi yet: its
@@ -582,11 +586,11 @@ targets:
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).NotificationService
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.chenda.Oppi.NotificationService
+        PRODUCT_BUNDLE_IDENTIFIER: no.vastveit.Oppi.NotificationService
         MARKETING_VERSION: "1.1.2"
-        CURRENT_PROJECT_VERSION: 55
+        CURRENT_PROJECT_VERSION: 58
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: AZAQMY4SPZ
+        DEVELOPMENT_TEAM: CVJWS3US42
 
   OppiTests:
     type: bundle.unit-test
@@ -606,7 +610,7 @@ targets:
         product: NIOSSH
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.chenda.OppiTests
+        PRODUCT_BUNDLE_IDENTIFIER: no.vastveit.OppiTests
         CODE_SIGN_IDENTITY: ""
         CODE_SIGNING_ALLOWED: "NO"
     info:
@@ -622,7 +626,7 @@ targets:
       - target: Oppi
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.chenda.OppiPerfTests
+        PRODUCT_BUNDLE_IDENTIFIER: no.vastveit.OppiPerfTests
         CODE_SIGN_IDENTITY: ""
         CODE_SIGNING_ALLOWED: "NO"
 
@@ -638,7 +642,7 @@ targets:
       - target: Oppi
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.chenda.OppiUITests
+        PRODUCT_BUNDLE_IDENTIFIER: no.vastveit.OppiUITests
         CODE_SIGN_IDENTITY: ""
         CODE_SIGNING_ALLOWED: "NO"
 
@@ -654,7 +658,7 @@ targets:
       - target: Oppi
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.chenda.OppiE2ETests
+        PRODUCT_BUNDLE_IDENTIFIER: no.vastveit.OppiE2ETests
         CODE_SIGN_IDENTITY: ""
         CODE_SIGNING_ALLOWED: "NO"
 
@@ -669,7 +673,7 @@ targets:
       - target: OppiMac
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.chenda.OppiMacTests
+        PRODUCT_BUNDLE_IDENTIFIER: no.vastveit.OppiMacTests
         CODE_SIGN_IDENTITY: ""
         CODE_SIGNING_ALLOWED: "NO"
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Oppi.app/Contents/MacOS/Oppi"
@@ -750,13 +754,13 @@ targets:
         product: TreeSitterTOML
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.chenda.OppiMac
+        PRODUCT_BUNDLE_IDENTIFIER: no.vastveit.OppiMac
         PRODUCT_NAME: Oppi
         MARKETING_VERSION: "0.2.0"
         CURRENT_PROJECT_VERSION: 40
         CODE_SIGN_IDENTITY: "Developer ID Application"
         CODE_SIGN_STYLE: Manual
-        DEVELOPMENT_TEAM: AZAQMY4SPZ
+        DEVELOPMENT_TEAM: CVJWS3US42
         ENABLE_HARDENED_RUNTIME: true
         CODE_SIGN_ENTITLEMENTS: OppiMac/OppiMac.entitlements
       configs:
