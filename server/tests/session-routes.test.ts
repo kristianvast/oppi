@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createRouteHelpers } from "../src/routes/http.js";
 import { createSessionRoutes } from "../src/routes/sessions.js";
+import { Storage } from "../src/storage.js";
 import type { RouteContext } from "../src/routes/types.js";
 import type { Session, Workspace } from "../src/types.js";
 import {
@@ -415,6 +416,7 @@ describe("sessions module", () => {
       const ctx = {
         storage: {
           getWorkspace: vi.fn(() => workspace),
+          getConfig: vi.fn(() => Storage.getDefaultConfig(dataDir)),
           getDataDir: vi.fn(() => dataDir),
           createSession: vi.fn(() => session),
           saveSession: vi.fn((updated: Session) => Object.assign(session, updated)),
@@ -487,6 +489,7 @@ describe("sessions module", () => {
           session.model = model;
           return session;
         }),
+        getConfig: vi.fn(() => Storage.getDefaultConfig(tmpdir())),
         saveSession,
         listSessions: vi.fn(() => [session]),
         findSessionByLaunchIdempotencyKey: vi.fn(() => undefined),

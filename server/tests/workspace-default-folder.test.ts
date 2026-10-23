@@ -569,6 +569,25 @@ describe("a host workspace cannot be rooted at the home folder or above it", () 
     );
   });
 
+  it("admits home itself, and nothing above it, only for a host workspace that allows it", () => {
+    const allow = { allowHomeFolder: true };
+    for (const hostMount of [join(home, ".."), "/"]) {
+      expect(() => storage.createWorkspace({ name: "Above", hostMount }, allow)).toThrow(
+        "cannot be your home folder or a folder above it",
+      );
+    }
+    expect(() =>
+      storage.createWorkspace({ name: "Sandbox", hostMount: home, runtime: "sandbox" }, allow),
+    ).toThrow("cannot be your home folder or a folder above it");
+    expect(storage.listWorkspaces()).toEqual([]);
+
+    expect(storage.createWorkspace({ name: "Home", hostMount: home }, allow)).toMatchObject({
+      name: "Home",
+      hostMount: home,
+      runtime: "host",
+    });
+  });
+
   it("judges the stored folder when an update switches runtime", () => {
     const ws = storage.createWorkspace({ name: "Switch", hostMount: "~/s", runtime: "sandbox" });
     writeLegacyRecord(ws.id, (raw) => (raw.hostMount = "~"));

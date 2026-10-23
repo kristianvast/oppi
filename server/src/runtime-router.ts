@@ -28,6 +28,10 @@ export class SessionRuntimes implements AgentRuntimeTransport {
     return this.isPiTui(session) ? this.piTui : this.oppi;
   }
 
+  waitForLaunchedSession(sessionId: string, signal: AbortSignal): Promise<Session> {
+    return this.piTui.waitForLaunchedSession(sessionId, signal);
+  }
+
   private isPiTui(session: Session | undefined | null): session is Session {
     return session?.runtime === "pi-tui";
   }

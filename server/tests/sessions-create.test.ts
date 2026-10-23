@@ -111,6 +111,7 @@ function createMockContext(workspace?: Workspace): MockRouteContext {
   const errors: Array<{ status: number; message: string }> = [];
 
   const storage = {
+    getConfig: vi.fn(() => Storage.getDefaultConfig("/tmp/oppi-routes-sessions-create-tests")),
     getDataDir: vi.fn().mockReturnValue("/tmp/oppi-routes-sessions-create-tests"),
     getWorkspace: vi.fn().mockReturnValue(ws),
     createSession: vi

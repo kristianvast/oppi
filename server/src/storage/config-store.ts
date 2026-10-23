@@ -232,6 +232,7 @@ function normalizeConfig(
     "maxSessionsGlobal",
     "runtimePathEntries",
     "runtimeEnv",
+    "newSessionLauncher",
     "oppiDocsPrompt",
     "oppiCliPrompt",
     "experimental",
@@ -312,6 +313,30 @@ function normalizeConfig(
     }
     return value;
   };
+
+  if (obj.newSessionLauncher !== undefined) {
+    const launcher = obj.newSessionLauncher;
+    if (!isRecord(launcher)) {
+      errors.push("config.newSessionLauncher: expected object");
+    } else {
+      for (const key of Object.keys(launcher)) {
+        if (key !== "kind" && key !== "command") {
+          errors.push(`config.newSessionLauncher.${key}: unknown key`);
+        }
+      }
+      if (launcher.kind !== "herdr-omo") {
+        errors.push("config.newSessionLauncher.kind: expected herdr-omo");
+      }
+      if (typeof launcher.command !== "string" || !launcher.command.trim()) {
+        errors.push("config.newSessionLauncher.command: expected non-empty executable");
+      } else if (
+        launcher.kind === "herdr-omo" &&
+        Object.keys(launcher).every((key) => key === "kind" || key === "command")
+      ) {
+        config.newSessionLauncher = { kind: "herdr-omo", command: launcher.command.trim() };
+      }
+    }
+  }
 
   if (obj.experimental !== undefined) {
     if (!isRecord(obj.experimental)) {

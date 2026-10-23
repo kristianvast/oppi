@@ -74,7 +74,7 @@ import {
   createRuntimeSessionStateScaffold,
   type RuntimeSessionStateScaffold,
 } from "./session-runtime-state.js";
-import { hostFolderClaimsHome } from "./host.js";
+import { hostFolderClaimsHome, hostFolderIsHome } from "./host.js";
 import type { Storage } from "./storage.js";
 import { resolveWorkspaceWorktreeForPath } from "./worktrees.js";
 import type {
@@ -115,6 +115,8 @@ export interface PiBridgeStateSnapshot {
   model?: string | { provider?: unknown; id?: unknown; modelId?: unknown } | null;
   thinkingLevel?: string;
   isIdle?: boolean;
+  /** Full count of live runtime background activities; absent on older mirrors. */
+  backgroundActivityCount?: number;
   contextUsage?: { tokens?: unknown; contextWindow?: unknown } | null;
   showCacheMissNotices?: boolean;
   cacheReadCostPerMillion?: number;
@@ -205,6 +207,7 @@ type PiBridgeInboundMessage =
   | PiBridgeExtensionUIRequestSettledMessage;
 
 interface MirrorActiveSession extends RuntimeSessionStateScaffold<MessageQueueState> {
+  backgroundActivityCount?: number;
   messageQueue: MessageQueueState;
   leafId?: string;
   lastSummaryFingerprint?: string;
@@ -399,6 +402,14 @@ function pathContains(parent: string, child: string): boolean {
   return resolvedChild === resolvedParent || resolvedChild.startsWith(`${resolvedParent}/`);
 }
 
+/**
+ * A workspace rooted at home claims the home folder only. Matching it by prefix would claim every
+ * terminal under home and stop folders there from getting their own workspace.
+ */
+function workspaceClaimsCwd(hostMount: string, cwd: string): boolean {
+  return hostFolderIsHome(hostMount) ? hostFolderIsHome(cwd) : pathContains(hostMount, cwd);
+}
+
 function requireExistingDirectory(path: string): string {
   const resolved = normalizePath(path);
   try {
@@ -435,8 +446,12 @@ function workspaceNameFromHostMount(hostMount: string): string {
   return basename(normalizePath(hostMount)) || "Terminal Workspace";
 }
 
+/** Name of the workspace the mirror suggests and creates for a terminal opened at home. */
+const HOME_WORKSPACE_NAME = "Home";
+
 function mirrorWorkspaceSuggestionForCwd(cwd: string): MirrorWorkspaceSuggestion {
   const hostMount = mirrorWorkspaceRootForCwd(cwd);
+  if (hostFolderIsHome(hostMount)) return { hostMount, name: HOME_WORKSPACE_NAME };
   return { hostMount, name: workspaceNameFromHostMount(hostMount) };
 }
 
@@ -530,6 +545,28 @@ export class PiTuiMirrorRuntime extends EventEmitter implements AgentRuntimeTran
   private taskRecordRejectionLogState:
     { key: string; lastLoggedAt: number; suppressedCount: number } | undefined;
   searchIndex: SearchIndex | null = null;
+
+  /** Subscribe before starting the terminal: registration can beat the CLI response. */
+  waitForLaunchedSession(sessionId: string, signal: AbortSignal): Promise<Session> {
+    return new Promise((resolve, reject) => {
+      const cleanup = (): void => {
+        this.off("launched_session_connected", connected);
+        signal.removeEventListener("abort", aborted);
+      };
+      const connected = (session: Session): void => {
+        if (session.id !== sessionId) return;
+        cleanup();
+        resolve(session);
+      };
+      const aborted = (): void => {
+        cleanup();
+        reject(signal.reason);
+      };
+      this.on("launched_session_connected", connected);
+      signal.addEventListener("abort", aborted, { once: true });
+      if (signal.aborted) aborted();
+    });
+  }
 
   constructor(
     private readonly storage: Storage,
@@ -1263,6 +1300,7 @@ export class PiTuiMirrorRuntime extends EventEmitter implements AgentRuntimeTran
       capabilityCount: connection.capabilities.length,
     });
 
+    this.emit("launched_session_connected", active.session);
     return connection;
   }
 
@@ -1578,6 +1616,21 @@ export class PiTuiMirrorRuntime extends EventEmitter implements AgentRuntimeTran
 
   private resolveWorkspace(hello: PiBridgeHelloMessage): Workspace | Promise<Workspace> {
     const cwd = hello.cwd ?? hello.state?.cwd;
+    // Phone-launched terminals deliberately run at home, even when associated
+    // with another host workspace. The reserved Pi UUID survives reconnects.
+    const launched = hello.state?.piSessionId
+      ? this.storage.getSession(hello.state.piSessionId)
+      : undefined;
+    const launchTarget = launched?.launch?.target;
+    if (
+      launched?.runtime === "pi-tui" &&
+      cwd !== undefined &&
+      launchTarget?.displayCwd === cwd &&
+      launchTarget.workspaceId
+    ) {
+      const workspace = this.storage.getWorkspace(launchTarget.workspaceId);
+      if (workspace && workspace.runtime !== "sandbox") return workspace;
+    }
     if (hello.workspaceId) {
       const workspace = this.storage.getWorkspace(hello.workspaceId);
       if (workspace) {
@@ -1601,7 +1654,7 @@ export class PiTuiMirrorRuntime extends EventEmitter implements AgentRuntimeTran
     }
 
     const contained = this.storage.listWorkspaces().flatMap((workspace) => {
-      if (!pathContains(workspace.hostMount, cwd)) return [];
+      if (!workspaceClaimsCwd(workspace.hostMount, cwd)) return [];
       return [{ workspace, matchPath: workspace.hostMount }];
     });
     if (contained.length > 0) {
@@ -1622,10 +1675,11 @@ export class PiTuiMirrorRuntime extends EventEmitter implements AgentRuntimeTran
     const workspace = match?.workspace;
     if (!workspace) {
       const suggestion = mirrorWorkspaceSuggestionForCwd(cwd);
-      if (hostFolderClaimsHome(suggestion.hostMount)) {
-        // No workspace can be rooted at home or above it, so none is suggested or created.
+      if (!hostFolderIsHome(suggestion.hostMount) && hostFolderClaimsHome(suggestion.hostMount)) {
+        // No workspace can be rooted above home, so none is suggested or created. Home itself
+        // gets the Home workspace, which claims only the home folder (see workspaceClaimsCwd).
         throw new BridgeRegistrationError(
-          `Terminal cwd is your home folder or above it; open the terminal in a project folder to mirror it: ${cwd}`,
+          `Terminal cwd is above your home folder; open the terminal in your home folder or a project folder to mirror it: ${cwd}`,
           "workspace_missing",
           { cwd },
         );
@@ -1673,13 +1727,18 @@ export class PiTuiMirrorRuntime extends EventEmitter implements AgentRuntimeTran
     suggestion: MirrorWorkspaceSuggestion,
     cwd: string,
   ): Workspace {
-    const workspace = this.storage.createWorkspace({
-      name: suggestion.name,
-      description: "Created from an interactive Pi terminal session.",
-      hostMount: suggestion.hostMount,
-      gitStatusEnabled: true,
-      runtime: "host",
-    });
+    const isHome = hostFolderIsHome(suggestion.hostMount);
+    const workspace = this.storage.createWorkspace(
+      {
+        name: suggestion.name,
+        description: "Created from an interactive Pi terminal session.",
+        hostMount: suggestion.hostMount,
+        // A dotfiles repository at home would make git status walk the whole home folder.
+        gitStatusEnabled: !isHome,
+        runtime: "host",
+      },
+      { allowHomeFolder: isHome },
+    );
 
     log.info("mirror_bridge.workspace_created", {
       runtime: MIRROR_RUNTIME_LOG_TAG,
@@ -1945,6 +2004,13 @@ export class PiTuiMirrorRuntime extends EventEmitter implements AgentRuntimeTran
       );
     }
     this.applyContextUsage(session, state.contextUsage);
+    if (
+      typeof state.backgroundActivityCount === "number" &&
+      Number.isSafeInteger(state.backgroundActivityCount) &&
+      state.backgroundActivityCount >= 0
+    ) {
+      active.backgroundActivityCount = state.backgroundActivityCount;
+    }
     if (
       state.isIdle !== undefined &&
       session.status !== "stopping" &&

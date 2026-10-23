@@ -56,6 +56,48 @@ const assistantEnd = (stopReason: string, errorMessage?: string) => ({
 });
 
 describe("program status derivation", () => {
+  it("keeps a settled parent working until its last background activity finishes", () => {
+    const host = makeHost(makeSession());
+    feed(host, { type: "agent_start" }, assistantEnd("stop"), { type: "agent_settled" });
+    host.backgroundActivityCount = 3;
+    expect(status(host).state).toBe("working");
+    host.backgroundActivityCount = 1;
+    expect(status(host).state).toBe("working");
+    host.backgroundActivityCount = 0;
+    expect(status(host).state).toBe("done");
+    expect(syncProgramStatus(host).changed).toBe(false);
+  });
+
+  it("does not finish when children complete while the parent is busy", () => {
+    const host = makeHost(makeSession({ status: "busy" }));
+    feed(host, { type: "agent_start" });
+    host.backgroundActivityCount = 0;
+    expect(status(host).state).toBe("working");
+  });
+
+  it("does not mark interrupted background work done when the mirror stops", () => {
+    const host = makeHost(makeSession());
+    feed(host, { type: "agent_start" }, assistantEnd("stop"), { type: "agent_settled" });
+    host.backgroundActivityCount = 2;
+    expect(status(host).state).toBe("working");
+    host.session.status = "stopped";
+    expect(status(host).state).toBe("idle");
+  });
+
+  it("preserves questions, aborted outcomes and stopped state with background activity", () => {
+    const host = makeHost(makeSession(), [{ method: "confirm", title: "Approve?" }]);
+    host.backgroundActivityCount = 2;
+    expect(status(host).state).toBe("blocked");
+    host.pendingUIRequests = new Map();
+    feed(host, { type: "agent_start" }, { type: "agent_settled", aborted: true });
+    expect(status(host).state).toBe("working");
+    host.backgroundActivityCount = 0;
+    expect(status(host).state).toBe("idle");
+    host.backgroundActivityCount = 2;
+    host.session.status = "stopped";
+    expect(status(host).state).toBe("idle");
+  });
+
   it.each(["starting", "busy"] as const)("%s is working with the session name", (lifecycle) => {
     expect(status(makeHost(makeSession({ status: lifecycle })))).toEqual({
       state: "working",
@@ -123,6 +165,38 @@ describe("program status derivation", () => {
   ])("%s blocks as question", (_name, request, message) => {
     const host = makeHost(makeSession({ status: "busy" }), [request]);
     expect(status(host)).toEqual({ state: "blocked", kind: "question", message });
+  });
+
+  it("gives question pushes the choices while status keeps the bare question", () => {
+    const host = makeHost(makeSession({ status: "busy" }), [
+      {
+        method: "ask",
+        questions: [
+          {
+            id: "q1",
+            question: "Which database?",
+            options: [
+              { value: "pg", label: "Postgres" },
+              { value: "sqlite", label: "SQLite" },
+            ],
+          },
+          { id: "q2", question: "Migrate now?", options: [] },
+        ],
+      },
+    ]);
+    const sync = syncProgramStatus(host, 5_000);
+    expect(sync.current).toMatchObject({ state: "blocked", message: "Which database?" });
+    expect(sync.blockedDetail).toBe("Which database? Options: Postgres, SQLite (+1 more question)");
+
+    const select = makeHost(makeSession({ status: "busy" }), [
+      { method: "select", title: "Pick one", options: ["a", "b"] },
+    ]);
+    expect(syncProgramStatus(select, 5_000).blockedDetail).toBe("Pick one Options: a, b");
+
+    const confirm = makeHost(makeSession({ status: "busy" }), [
+      { method: "confirm", title: "Allow?" },
+    ]);
+    expect(syncProgramStatus(confirm, 5_000).blockedDetail).toBeUndefined();
   });
 
   it("the most recent pending dialog wins", () => {

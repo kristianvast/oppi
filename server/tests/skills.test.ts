@@ -62,6 +62,25 @@ describe("SkillRegistry", () => {
     rmSync(scanDir, { recursive: true, force: true });
   });
 
+  describe("agent dir", () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("scans <PI_CODING_AGENT_DIR>/skills resolved at construction time", () => {
+      const agentDir = mkdtempSync(join(tmpdir(), "pi-skill-agentdir-"));
+      try {
+        makeSkillDir(join(agentDir, "skills"), "skill-a", SKILL_A);
+        vi.stubEnv("PI_CODING_AGENT_DIR", agentDir);
+        const hostRegistry = new SkillRegistry([], { debounceMs: 50 });
+        hostRegistry.scan();
+        expect(hostRegistry.get("skill-a")?.description).toBe("First test skill");
+      } finally {
+        rmSync(agentDir, { recursive: true, force: true });
+      }
+    });
+  });
+
   describe("scan", () => {
     it("discovers skills from directories with SKILL.md", () => {
       makeSkillDir(scanDir, "skill-a", SKILL_A);

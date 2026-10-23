@@ -1678,6 +1678,30 @@ describe("SessionManager follow_up", () => {
 
     await expect(manager.sendFollowUp("s1", "more")).rejects.toThrow("active streaming turn");
   });
+
+  it.each(["steer", "follow_up"] as const)(
+    "starts a new turn for %s while only background work keeps the session working",
+    async (kind) => {
+      const { manager, sdkBackend } = makeManagerHarness({
+        status: "ready",
+        programStatus: {
+          state: "working",
+          message: "Waiting on 2 background activities",
+          since: 1,
+        },
+      });
+
+      await (kind === "steer"
+        ? manager.sendSteer("s1", "how long is training?")
+        : manager.sendFollowUp("s1", "how long is training?"));
+
+      expect(sdkBackend.prompt).toHaveBeenCalledTimes(1);
+      expect(sdkBackend.prompt).toHaveBeenCalledWith(
+        "how long is training?",
+        expect.not.objectContaining({ streamingBehavior: expect.anything() }),
+      );
+    },
+  );
 });
 
 describe("SessionManager idle timer resets on send", () => {

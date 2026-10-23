@@ -1,5 +1,5 @@
 import { MobileRendererRegistry } from "../src/mobile-renderer.js";
-import { EventEmitter } from "node:events";
+import { EventEmitter, once } from "node:events";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { basename, join } from "node:path";
@@ -8,6 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
 
 import { PiTuiMirrorRuntime } from "../src/pi-tui-mirror-runtime.js";
+import { SessionPushNotifier } from "../src/session-push-notifier.js";
+import type { PushSender } from "../src/push/push-sender.js";
 import type { Storage } from "../src/storage.js";
 import type { ServerMessage, Session, Workspace } from "../src/types.js";
 import { WsMessageHandler, type WsSessionCommands } from "../src/ws-message-handler.js";
@@ -135,6 +137,7 @@ function makeRuntime(
   } as unknown as Storage;
 
   return {
+    storage,
     runtime: new PiTuiMirrorRuntime(storage, {
       mobileRenderers: new MobileRendererRegistry(),
       isOppiSessionActive: options.isOppiSessionActive,
@@ -269,6 +272,130 @@ async function waitForNextCommand(
 }
 
 describe("PiTuiMirrorRuntime queue bridge", () => {
+  it("pushes done once only after an idle parent's final background activity", async () => {
+    const { runtime, storage } = makeRuntime();
+    const send = vi.fn(async () => null);
+    const push = {
+      registrations: () => [{ deviceId: "phone" }],
+      send,
+    } as unknown as PushSender;
+    const notifier = new SessionPushNotifier(push, storage, { isDevicePresent: () => false });
+    runtime.on("program_status_change", (session, change) => {
+      notifier.handleProgramStatusChange(session, change);
+    });
+    const ws = new FakeBridgeWebSocket();
+    runtime.handleBridgeWebSocket(ws as unknown as WebSocket);
+    const registered = once(runtime, "launched_session_connected", {
+      signal: AbortSignal.timeout(2_000),
+    });
+    ws.receive({
+      type: "hello",
+      protocolVersion: 2,
+      bridgeId: "background-work",
+      workspaceId: "w1",
+      cwd: "/tmp/oppi-mirror-test",
+      capabilities: ["input_preflight:v1"],
+      state: { piSessionId: "background-parent", isIdle: false, backgroundActivityCount: 3 },
+    });
+    const [session] = await registered;
+    // Pushes need something to name: an anonymous session's `done` is not sent.
+    session.name = "Background work";
+    // A real socket delivers its next frame after the hello registration microtasks drain.
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    const waiting = once(runtime, "program_status_change", {
+      signal: AbortSignal.timeout(2_000),
+    });
+    ws.receive({ type: "event", event: { type: "agent_start" } });
+    ws.receive({
+      type: "event",
+      event: { type: "agent_settled" },
+      state: { isIdle: true, backgroundActivityCount: 3 },
+    });
+    await waiting;
+    expect(session.programStatus.state).toBe("working");
+    expect(send).not.toHaveBeenCalled();
+
+    ws.receive({ type: "state", state: { isIdle: true, backgroundActivityCount: 1 } });
+    ws.receive({ type: "state", state: { isIdle: true, backgroundActivityCount: -1 } });
+    ws.receive({ type: "state", state: { isIdle: true } });
+    expect(session.programStatus.state).toBe("working");
+    expect(send).not.toHaveBeenCalled();
+
+    ws.receive({ type: "state", state: { isIdle: true, backgroundActivityCount: 0 } });
+    ws.receive({ type: "state", state: { isIdle: true, backgroundActivityCount: 0 } });
+    expect(session.programStatus.state).toBe("done");
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({ deviceId: "phone" }),
+      expect.objectContaining({ event: "done", sessionId: session.id }),
+    );
+    ws.emit("close");
+  });
+
+  it("binds a reserved launch UUID at home to its selected host workspace", async () => {
+    const { runtime, sessions } = makeRuntime();
+    const id = "d597e4f1-9f16-4ff4-ac26-c63d22ca0f40";
+    sessions.set(id, {
+      id,
+      runtime: "pi-tui",
+      workspaceId: "w1",
+      status: "starting",
+      createdAt: 1,
+      lastActivity: 1,
+      messageCount: 0,
+      tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      cost: 0,
+      launch: {
+        status: "launching",
+        requestedAt: 1,
+        target: { workspaceId: "w1", runtime: "host", displayCwd: homedir() },
+      },
+    });
+    const controller = new AbortController();
+    const registered = runtime.waitForLaunchedSession(id, controller.signal);
+    const ws = new FakeBridgeWebSocket();
+    runtime.handleBridgeWebSocket(ws as unknown as WebSocket);
+    ws.receive({
+      type: "hello",
+      protocolVersion: 2,
+      bridgeId: "phone-launch",
+      cwd: homedir(),
+      capabilities: ["input_preflight:v1"],
+      state: { piSessionId: id, cwd: homedir() },
+    });
+    expect(await registered).toMatchObject({ id, workspaceId: "w1", runtime: "pi-tui" });
+    expect(ws.sent.some((message) => message.type === "hello_ack")).toBe(true);
+    expect(runtime.isSessionConnected(id)).toBe(true);
+    expect(sessions.size).toBe(1);
+    expect(runtime.listenerCount("launched_session_connected")).toBe(0);
+    ws.emit("close");
+    const reconnected = runtime.waitForLaunchedSession(id, controller.signal);
+    const replacement = new FakeBridgeWebSocket();
+    runtime.handleBridgeWebSocket(replacement as unknown as WebSocket);
+    replacement.receive({
+      type: "hello",
+      protocolVersion: 2,
+      bridgeId: "phone-launch-reconnected",
+      cwd: homedir(),
+      capabilities: ["input_preflight:v1"],
+      state: { piSessionId: id, cwd: homedir() },
+    });
+    expect(await reconnected).toMatchObject({ id, workspaceId: "w1" });
+    expect(sessions.size).toBe(1);
+    replacement.emit("close");
+  });
+
+  it("removes an aborted launch subscription", async () => {
+    const { runtime } = makeRuntime();
+    const controller = new AbortController();
+    const registered = runtime.waitForLaunchedSession("reserved", controller.signal);
+    const reason = new Error("cancelled");
+    const assertion = expect(registered).rejects.toBe(reason);
+    controller.abort(reason);
+    await assertion;
+    expect(runtime.listenerCount("launched_session_connected")).toBe(0);
+  });
+
   it("matches home-relative workspace mounts against terminal cwd", async () => {
     const cwd = `${homedir()}/workspace/oppi/server`;
     const { runtime } = makeRuntime({ hostMount: "~/workspace/oppi" });
@@ -435,39 +562,119 @@ describe("PiTuiMirrorRuntime queue bridge", () => {
       else process.env.HOME = previousHome;
     });
 
-    it.each([
-      ["the home folder", (h: string) => h],
-      ["a folder above home", (h: string) => join(h, "..")],
-    ])(
-      "creates no workspace for %s, even when asked to, and suggests none",
-      async (_name, pick) => {
-        const cwd = pick(home);
-        const { runtime, workspaces } = makeRuntime({ includeDefaultWorkspace: false });
-        const ws = new FakeBridgeWebSocket();
-        runtime.handleBridgeWebSocket(ws as unknown as WebSocket);
+    it("creates no workspace for a folder above home, even when asked to, and suggests none", async () => {
+      const cwd = join(home, "..");
+      const { runtime, workspaces } = makeRuntime({ includeDefaultWorkspace: false });
+      const ws = new FakeBridgeWebSocket();
+      runtime.handleBridgeWebSocket(ws as unknown as WebSocket);
 
-        ws.receive({
-          type: "hello",
-          protocolVersion: 2,
-          bridgeId: "bridge-home",
-          cwd,
-          createWorkspace: true,
-          capabilities: ["input_preflight:v1"],
-          state: { piSessionId: "pi-home", sessionFile: join(cwd, "session.jsonl") },
-        });
+      ws.receive({
+        type: "hello",
+        protocolVersion: 2,
+        bridgeId: "bridge-home",
+        cwd,
+        createWorkspace: true,
+        capabilities: ["input_preflight:v1"],
+        state: { piSessionId: "pi-home", sessionFile: join(cwd, "session.jsonl") },
+      });
 
-        await waitForBridgeResult(ws);
-        const rejection = ws.sent.at(-1) as Record<string, unknown>;
-        expect(rejection).toMatchObject({
-          type: "error",
-          code: "workspace_missing",
-          cwd,
-          error: expect.stringContaining("home folder or above it"),
-        });
-        expect(rejection).not.toHaveProperty("suggestedHostMount");
-        expect(workspaces.size).toBe(0);
-      },
-    );
+      await waitForBridgeResult(ws);
+      const rejection = ws.sent.at(-1) as Record<string, unknown>;
+      expect(rejection).toMatchObject({
+        type: "error",
+        code: "workspace_missing",
+        cwd,
+        error: expect.stringContaining("above your home folder"),
+      });
+      expect(rejection).not.toHaveProperty("suggestedHostMount");
+      expect(workspaces.size).toBe(0);
+    });
+
+    it("suggests a Home workspace for the home folder when creation was not requested", async () => {
+      const { runtime, workspaces } = makeRuntime({ includeDefaultWorkspace: false });
+      const ws = new FakeBridgeWebSocket();
+      runtime.handleBridgeWebSocket(ws as unknown as WebSocket);
+
+      ws.receive({
+        type: "hello",
+        protocolVersion: 2,
+        bridgeId: "bridge-home",
+        cwd: home,
+        capabilities: ["input_preflight:v1"],
+        state: { piSessionId: "pi-home", sessionFile: join(home, "session.jsonl") },
+      });
+
+      await waitForBridgeResult(ws);
+      expect(ws.sent.at(-1)).toMatchObject({
+        type: "error",
+        code: "workspace_missing",
+        cwd: home,
+        suggestedHostMount: home,
+        suggestedName: "Home",
+      });
+      expect(workspaces.size).toBe(0);
+    });
+
+    it("creates a Home workspace at the home folder and reuses it for the next home terminal", async () => {
+      const { runtime, workspaces } = makeRuntime({ includeDefaultWorkspace: false });
+
+      const first = await connectBridge(runtime, {
+        bridgeId: "bridge-home-1",
+        piSessionId: "pi-home-1",
+        cwd: home,
+        workspaceId: null,
+        createWorkspace: true,
+        sessionFile: join(home, "one.jsonl"),
+      });
+      const second = await connectBridge(runtime, {
+        bridgeId: "bridge-home-2",
+        piSessionId: "pi-home-2",
+        cwd: home,
+        workspaceId: null,
+        createWorkspace: true,
+        sessionFile: join(home, "two.jsonl"),
+      });
+
+      expect(workspaces.size).toBe(1);
+      const created = Array.from(workspaces.values())[0];
+      expect(created).toMatchObject({
+        name: "Home",
+        hostMount: home,
+        gitStatusEnabled: false,
+        runtime: "host",
+      });
+      expect(runtime.getActiveSession(first.sessionId)?.workspaceId).toBe(created?.id);
+      expect(runtime.getActiveSession(second.sessionId)?.workspaceId).toBe(created?.id);
+    });
+
+    it("lets a Home workspace claim only home: folders under it match their own workspaces", async () => {
+      const project = join(home, "project");
+      await mkdir(project);
+      const { runtime, workspaces } = makeRuntime({ includeDefaultWorkspace: false });
+      workspaces.set("w-home", { id: "w-home", name: "Home", hostMount: home });
+      workspaces.set("w-project", { id: "w-project", name: "Project", hostMount: project });
+
+      const inProject = await connectBridge(runtime, {
+        bridgeId: "bridge-project",
+        piSessionId: "pi-project",
+        cwd: project,
+        workspaceId: null,
+        sessionFile: join(project, "session.jsonl"),
+      });
+      const inScratch = await connectBridge(runtime, {
+        bridgeId: "bridge-scratch",
+        piSessionId: "pi-scratch",
+        cwd: join(home, "scratch"),
+        workspaceId: null,
+        createWorkspace: true,
+        sessionFile: join(home, "scratch", "session.jsonl"),
+      });
+
+      expect(runtime.getActiveSession(inProject.sessionId)?.workspaceId).toBe("w-project");
+      const scratchWorkspaceId = runtime.getActiveSession(inScratch.sessionId)?.workspaceId;
+      expect(scratchWorkspaceId).not.toBe("w-home");
+      expect(workspaces.get(scratchWorkspaceId ?? "")?.hostMount).toBe(join(home, "scratch"));
+    });
 
     it("roots a workspace at the folder, not at home, when home is itself a git repository", async () => {
       await writeFile(join(home, ".git"), "gitdir: .git-test\n");

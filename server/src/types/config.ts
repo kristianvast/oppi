@@ -99,6 +99,12 @@ export interface ServerConfig {
   /** Additional runtime environment variables. */
   runtimeEnv?: Record<string, string>;
 
+  /** Opt-in interactive launcher for ordinary new host sessions. */
+  newSessionLauncher?: {
+    kind: "herdr-omo";
+    command: string;
+  };
+
   /** Prompt hint that points Oppi-owned sessions at packaged Oppi docs. */
   oppiDocsPrompt?: {
     enabled: boolean;

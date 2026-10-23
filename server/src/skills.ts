@@ -1,7 +1,7 @@
 /**
  * Skill registry — discovers and catalogs skills from Pi-owned locations.
  *
- * Default skills: discovered from ~/.pi/agent/skills.
+ * Default skills: discovered from <agent dir>/skills (~/.pi/agent unless PI_CODING_AGENT_DIR is set).
  * Bundled skills: discovered from server/skills when present.
  * Package skills: discovered from pi packages installed via `pi install`
  * and settings-declared skill paths through the Pi SDK.
@@ -17,10 +17,10 @@ import {
   type FSWatcher,
 } from "node:fs";
 import { join } from "node:path";
-import { homedir } from "node:os";
 import { EventEmitter } from "node:events";
 import {
   DefaultPackageManager,
+  getAgentDir,
   loadSkills,
   SettingsManager,
   type Skill,
@@ -59,8 +59,6 @@ function sdkSkillToInfo(skill: Skill): SkillInfo {
 // ─── Skill Registry ───
 
 const log = createLogger({ base: { component: "skills" } });
-const HOST_AGENT_DIR = join(homedir(), ".pi", "agent");
-const HOST_SKILLS_DIR = join(HOST_AGENT_DIR, "skills");
 const SKILLS_SDK_CWD = process.cwd();
 
 /** Emitted when the skill catalog changes after a re-scan. */
@@ -82,7 +80,7 @@ export class SkillRegistry extends EventEmitter {
 
   constructor(extraDirs?: string[], opts?: { debounceMs?: number }) {
     super();
-    this.scanDirs = [HOST_SKILLS_DIR, ...(extraDirs || [])];
+    this.scanDirs = [join(getAgentDir(), "skills"), ...(extraDirs || [])];
     this.debounceMs = opts?.debounceMs ?? 500;
   }
 
@@ -101,10 +99,10 @@ export class SkillRegistry extends EventEmitter {
     this.packageSkillsResolved = true;
 
     try {
-      const settingsManager = SettingsManager.create(SKILLS_SDK_CWD, HOST_AGENT_DIR);
+      const settingsManager = SettingsManager.create(SKILLS_SDK_CWD, getAgentDir());
       const packageManager = new DefaultPackageManager({
         cwd: SKILLS_SDK_CWD,
-        agentDir: HOST_AGENT_DIR,
+        agentDir: getAgentDir(),
         settingsManager,
       });
 
@@ -153,7 +151,7 @@ export class SkillRegistry extends EventEmitter {
       try {
         const result = loadSkills({
           cwd: SKILLS_SDK_CWD,
-          agentDir: HOST_AGENT_DIR,
+          agentDir: getAgentDir(),
           skillPaths: [dir],
           includeDefaults: false,
         });
@@ -180,7 +178,7 @@ export class SkillRegistry extends EventEmitter {
       try {
         const result = loadSkills({
           cwd: SKILLS_SDK_CWD,
-          agentDir: HOST_AGENT_DIR,
+          agentDir: getAgentDir(),
           skillPaths: this.packageSkillPaths,
           includeDefaults: false,
         });

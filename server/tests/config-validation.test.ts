@@ -33,6 +33,36 @@ describe("Storage config validation", () => {
     // New configs leave TLS undecided; first `init`/`serve`/`pair` chooses it.
     expect(result.config?.tls?.mode).toBe("disabled");
     expect(result.config?.images?.autoResize).toBe(false);
+    expect(result.config?.newSessionLauncher).toBeUndefined();
+  });
+
+  it("loads an explicitly configured interactive launcher", () => {
+    const newSessionLauncher = { kind: "herdr-omo", command: "/Users/owner/.local/bin/omo" };
+    const result = Storage.validateConfig(
+      { ...Storage.getDefaultConfig(dir), newSessionLauncher },
+      dir,
+      true,
+    );
+    expect(result.valid).toBe(true);
+    expect(result.config?.newSessionLauncher).toEqual(newSessionLauncher);
+  });
+
+  it.each([
+    null,
+    true,
+    {},
+    { kind: "shell", command: "omo" },
+    { kind: "herdr-omo", command: "" },
+    { kind: "herdr-omo", command: 1 },
+    { kind: "herdr-omo", command: "omo", extra: true },
+  ])("rejects an invalid interactive launcher %j", (newSessionLauncher) => {
+    const result = Storage.validateConfig(
+      { ...Storage.getDefaultConfig(dir), newSessionLauncher },
+      dir,
+      false,
+    );
+    expect(result.valid).toBe(false);
+    expect(result.config?.newSessionLauncher).toBeUndefined();
   });
 
   it.each([true, false])("validates the opt-in durable boolean %s", (serverDurable) => {

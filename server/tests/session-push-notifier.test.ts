@@ -51,9 +51,15 @@ type MockStorage = Storage & {
   getSession: ReturnType<typeof vi.fn<(id: string) => Session | undefined>>;
 };
 
-function makeStorage(session: Session | undefined = makeSession()): MockStorage {
+function makeStorage(
+  session: Session | undefined = makeSession(),
+  workspaces: Record<string, string> = {},
+): MockStorage {
   return {
     getSession: vi.fn((id: string) => (session?.id === id ? session : undefined)),
+    getWorkspace: vi.fn((id: string) =>
+      workspaces[id] ? { id, name: workspaces[id] } : undefined,
+    ),
   } as unknown as MockStorage;
 }
 
@@ -115,9 +121,9 @@ describe("SessionPushNotifier", () => {
     ]);
   });
 
-  it("uses a fixed body when a session ends without a reason", () => {
+  it("uses a fixed body when a named session ends without a reason", () => {
     const push = makePush(["phone"]);
-    const notifier = makeNotifier(push, makeStorage(makeSession()));
+    const notifier = makeNotifier(push, makeStorage(makeSession({ name: "Deploy" })));
 
     notifier.handleSessionEvent(event("s1", { type: "session_ended", reason: "" }));
 
@@ -173,7 +179,7 @@ describe("SessionPushNotifier", () => {
       ["permission", "Needs Approval", "Waiting for your approval."],
       ["question", "Question", "Waiting for your answer."],
       ["auth", "Sign-in Needed", "Waiting for you to sign in."],
-    ] as const)("pushes on entering blocked (%s) with fixed text", (kind, title, body) => {
+    ] as const)("pushes on entering blocked (%s) with the request text", (kind, title) => {
       const push = makePush(["phone"]);
       const session = makeSession({ name: "Deploy" });
       const notifier = makeNotifier(push, makeStorage(session));
@@ -190,18 +196,48 @@ describe("SessionPushNotifier", () => {
         event: "blocked",
         kind,
         title,
-        body,
+        body: "Allow rm -rf /Users/alice/secrets?",
         sessionId: "s1",
         workspaceId: "w1",
         subtitle: "Deploy",
       });
-      // The dialog title lives in program status; v1 pushes never carry it.
-      expect(JSON.stringify(push.send.mock.calls)).not.toContain("alice");
+    });
+
+    it("names the workspace in the title and falls back to the first prompt for an unnamed session", () => {
+      const push = makePush(["phone"]);
+      const session = makeSession({ firstMessage: "  fix the\n flaky   login test " });
+      const notifier = makeNotifier(push, makeStorage(session, { w1: "Home" }));
+
+      notifier.handleProgramStatusChange(
+        session,
+        change(
+          { state: "working" },
+          { state: "blocked", kind: "question", message: "Which branch?" },
+        ),
+      );
+
+      expect(push.send).toHaveBeenCalledWith(
+        target("phone"),
+        expect.objectContaining({
+          title: "Question \u00b7 Home",
+          subtitle: "fix the flaky login test",
+          body: "Which branch?",
+        }),
+      );
+    });
+
+    it("skips session-ended alerts for mirrored terminals", () => {
+      const push = makePush(["phone"]);
+      const notifier = makeNotifier(push, makeStorage(makeSession({ runtime: "pi-tui" })));
+
+      notifier.handleSessionEvent(event("s1", { type: "session_ended", reason: "closed" }));
+
+      expect(push.send).not.toHaveBeenCalled();
     });
 
     it("treats a blocked status without a kind as a question", () => {
       const push = makePush(["phone"]);
-      const session = makeSession();
+      const session = makeSession({ name: "Deploy" });
       const notifier = makeNotifier(push, makeStorage(session));
 
       notifier.handleProgramStatusChange(
@@ -215,12 +251,24 @@ describe("SessionPushNotifier", () => {
       );
     });
 
-    it("pushes on entering done with a fixed body and no model text", () => {
+    it("uses the fixed done body when the session has no last message", () => {
+      const push = makePush(["phone"]);
+      const session = makeSession({ name: "Fix login" });
+      const notifier = makeNotifier(push, makeStorage(session));
+
+      notifier.handleProgramStatusChange(session, change({ state: "working" }, { state: "done" }));
+
+      expect(push.send).toHaveBeenCalledWith(
+        target("phone"),
+        expect.objectContaining({ title: "Session Done", body: "The run finished." }),
+      );
+    });
+
+    it("pushes on entering done with the start of the last message", () => {
       const push = makePush(["phone"]);
       const session = makeSession({
         name: "Fix login",
-        lastMessage: "SECRET assistant output",
-        firstMessage: "SECRET prompt",
+        lastMessage: `Fixed the login test.\n\n${"x".repeat(400)}`,
       });
       const notifier = makeNotifier(push, makeStorage(session));
 
@@ -235,16 +283,17 @@ describe("SessionPushNotifier", () => {
         expect.objectContaining({
           event: "done",
           title: "Session Done",
-          body: "The run finished.",
+          subtitle: "Fix login",
+          body: `Fixed the login test. ${"x".repeat(217)}\u2026`,
         }),
       );
-      expect(JSON.stringify(push.send.mock.calls)).not.toContain("SECRET");
     });
 
     it("pushes no done for a delegated session, but still pushes its blocked", () => {
       const push = makePush(["phone"]);
       const child = makeSession({
         id: "child",
+        name: "Child task",
         launch: { status: "created", requestedAt: 1, parentSessionId: "parent" },
       });
       const notifier = makeNotifier(push, makeStorage(child));
@@ -265,11 +314,52 @@ describe("SessionPushNotifier", () => {
 
     it("still pushes done for a top-level session that has launch metadata", () => {
       const push = makePush(["phone"]);
-      const session = makeSession({ launch: { status: "created", requestedAt: 1 } });
+      const session = makeSession({
+        name: "Deploy",
+        launch: { status: "created", requestedAt: 1 },
+      });
       const notifier = makeNotifier(push, makeStorage(session));
 
       notifier.handleProgramStatusChange(session, change({ state: "working" }, { state: "done" }));
 
+      expect(push.send).toHaveBeenCalledTimes(1);
+    });
+
+    it("puts the question's choices and remaining count in the body", () => {
+      const push = makePush(["phone"]);
+      const session = makeSession({ name: "Deploy" });
+      const notifier = makeNotifier(push, makeStorage(session));
+
+      notifier.handleProgramStatusChange(session, {
+        ...change(
+          { state: "working" },
+          { state: "blocked", kind: "question", message: "Which branch?" },
+        ),
+        blockedDetail: "Which branch? Options: main, dev (+1 more question)",
+      });
+
+      expect(push.send).toHaveBeenCalledWith(
+        target("phone"),
+        expect.objectContaining({ body: "Which branch? Options: main, dev (+1 more question)" }),
+      );
+    });
+
+    it("drops anonymous alerts: no session label and only fixed text", () => {
+      const push = makePush(["phone"]);
+      const session = makeSession();
+      const notifier = makeNotifier(push, makeStorage(session));
+
+      notifier.handleProgramStatusChange(session, change({ state: "working" }, { state: "done" }));
+      notifier.handleProgramStatusChange(
+        session,
+        change({ state: "working" }, { state: "blocked", kind: "question" }),
+      );
+      notifier.handleSessionEvent(event("s1", { type: "error", error: "boom" }));
+      notifier.handleSessionEvent(event("s1", { type: "session_ended", reason: "" }));
+      expect(push.send).not.toHaveBeenCalled();
+
+      // Detail alone says what the alert is about, without a session label.
+      notifier.handleSessionEvent(event("s1", { type: "session_ended", reason: "completed" }));
       expect(push.send).toHaveBeenCalledTimes(1);
     });
 
@@ -299,7 +389,7 @@ describe("SessionPushNotifier", () => {
 
     it("skips only devices that are present: an open iPad does not silence the phone", () => {
       const push = makePush(["phone", "ipad"]);
-      const session = makeSession();
+      const session = makeSession({ name: "Deploy" });
       const notifier = makeNotifier(push, makeStorage(session), {
         presentDevices: ["dev-ipad"],
       });
@@ -318,7 +408,7 @@ describe("SessionPushNotifier", () => {
 
     it("stays silent while the only device is present, and pushes once it leaves", () => {
       const push = makePush(["phone"]);
-      const session = makeSession();
+      const session = makeSession({ name: "Deploy" });
       const present = new Set(["dev-phone"]);
       const notifier = new SessionPushNotifier(push, makeStorage(session), {
         isDevicePresent: (deviceId) => present.has(deviceId),
@@ -345,7 +435,7 @@ describe("SessionPushNotifier", () => {
 
     it("rate-limits per session and kind, then allows a later transition", () => {
       const push = makePush(["phone"]);
-      const session = makeSession();
+      const session = makeSession({ name: "Deploy" });
       let now = 1_000_000;
       const notifier = makeNotifier(push, makeStorage(session), { now: () => now });
       const toDone = change({ state: "working" }, { state: "done" });
@@ -360,7 +450,7 @@ describe("SessionPushNotifier", () => {
         session,
         change({ state: "working" }, { state: "blocked", kind: "question", message: "Q?" }),
       );
-      notifier.handleProgramStatusChange(makeSession({ id: "s2" }), toDone);
+      notifier.handleProgramStatusChange(makeSession({ id: "s2", lastMessage: "Done." }), toDone);
       expect(push.send).toHaveBeenCalledTimes(3);
 
       now += 60_000;
@@ -371,7 +461,7 @@ describe("SessionPushNotifier", () => {
     it("does not start the throttle when no device has a push key", () => {
       const devices: string[] = [];
       const push = makePush(devices);
-      const session = makeSession();
+      const session = makeSession({ name: "Deploy" });
       const notifier = makeNotifier(push, makeStorage(session));
       const toDone = change({ state: "working" }, { state: "done" });
 

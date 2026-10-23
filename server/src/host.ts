@@ -158,6 +158,11 @@ export function hostFolderClaimsHome(hostMount: string): boolean {
   return home === folder || home.startsWith(folder === "/" ? "/" : `${folder}/`);
 }
 
+/** True when `path` is the home folder itself (real paths, so a symlink to home counts). */
+export function hostFolderIsHome(path: string): boolean {
+  return realpathOrResolved(resolveHostPath(path)) === realpathOrResolved(homedir());
+}
+
 /** Validates that a folder the owner entered exists and is a directory. */
 export function hostMountValidationError(hostMount: unknown): string | undefined {
   if (hostMount === undefined || hostMount === null) {

@@ -3,7 +3,7 @@
  *
  * Renderers live in ~/.pi/agent/mobile-renderers/ (separate from extensions).
  */
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -17,6 +17,17 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(tempDir, { recursive: true, force: true });
+});
+
+describe("rendererDir", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("resolves <PI_CODING_AGENT_DIR>/mobile-renderers at call time", () => {
+    vi.stubEnv("PI_CODING_AGENT_DIR", tempDir);
+    expect(MobileRendererRegistry.rendererDir()).toBe(join(tempDir, "mobile-renderers"));
+  });
 });
 
 describe("discoverRenderers", () => {

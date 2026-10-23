@@ -48,6 +48,8 @@ interface ProgramStatusDialog {
 /** Anything that owns a session plus live runtime state: active sessions, mirror sessions, startup state. */
 export interface ProgramStatusHost {
   session: Session;
+  /** Live runtime-owned work that can wake an idle parent; never persisted as liveness. */
+  backgroundActivityCount?: number;
   pendingUIRequests?: ReadonlyMap<string, ProgramStatusDialog>;
   programRun?: ProgramRunTracker;
 }
@@ -57,6 +59,11 @@ export interface ProgramStatusSync {
   current: ProgramStatus;
   /** State, kind, or message differs from the previous value. */
   changed: boolean;
+  /**
+   * While blocked on a question: the question with its choices, for the push body. Never
+   * stored or sent as program status, whose message stays the bare question.
+   */
+  blockedDetail?: string;
 }
 
 /** Notified when a sync changes a session's state, kind, or message. */
@@ -163,6 +170,57 @@ function blockedFromDialog(dialog: ProgramStatusDialog): {
   return { kind: "question", message: oneLine(dialog.title) };
 }
 
+function optionLabels(options: unknown): string[] {
+  if (!Array.isArray(options)) return [];
+  return options.flatMap((option: unknown) => {
+    const label =
+      typeof option === "string"
+        ? option
+        : typeof (option as { label?: unknown } | null)?.label === "string"
+          ? (option as { label: string }).label
+          : undefined;
+    const line = oneLine(label);
+    return line ? [line] : [];
+  });
+}
+
+/**
+ * What a question push says: the question, its choices, and how many questions follow.
+ * Undefined for dialogs that are not questions, or questions without text.
+ */
+function questionDetail(dialog: ProgramStatusDialog): string | undefined {
+  if (dialog.method === "ask" && Array.isArray(dialog.questions)) {
+    const first = dialog.questions[0] as { question?: unknown; options?: unknown } | undefined;
+    const question = oneLine(typeof first?.question === "string" ? first.question : dialog.title);
+    if (!question) return undefined;
+    const options = optionLabels(first?.options);
+    const more = dialog.questions.length - 1;
+    return [
+      question,
+      options.length > 0 ? `Options: ${options.join(", ")}` : undefined,
+      more > 0 ? `(+${more} more ${more === 1 ? "question" : "questions"})` : undefined,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+  if (dialog.method === "select") {
+    const title = oneLine(dialog.title);
+    if (!title) return undefined;
+    const options = optionLabels(dialog.options);
+    return options.length > 0 ? `${title} Options: ${options.join(", ")}` : title;
+  }
+  return undefined;
+}
+
+/** The most recent pending dialog that waits on the user, which is what `blocked` reports. */
+function blockingDialog(pending: Iterable<ProgramStatusDialog>): ProgramStatusDialog | undefined {
+  let blocking: ProgramStatusDialog | undefined;
+  for (const dialog of pending) {
+    if (isPendingUserReplyRequest(dialog)) blocking = dialog;
+  }
+  return blocking;
+}
+
 function lifecycleErrorMessage(session: Session): string | undefined {
   // A typed launch failure stores its machine code (`agent_tools_unavailable`) in promptError;
   // that is not a line a person should read, and clients render typed failures themselves.
@@ -184,6 +242,7 @@ function withMessage(
 export function deriveProgramStatus(input: {
   session: Session;
   tracker: ProgramRunTracker;
+  backgroundActivityCount?: number;
   pending: Iterable<ProgramStatusDialog>;
   now: number;
 }): ProgramStatus {
@@ -199,22 +258,25 @@ export function deriveProgramStatus(input: {
 function deriveBody(input: {
   session: Session;
   tracker: ProgramRunTracker;
+  backgroundActivityCount?: number;
   pending: Iterable<ProgramStatusDialog>;
 }): Omit<ProgramStatus, "since"> {
   const { session, tracker } = input;
 
   if (session.status === "stopped") {
     // Last outcome retained; a run cut short by the stop has no outcome.
-    return { state: tracker.runActive ? "idle" : tracker.resting.state };
+    return {
+      state:
+        tracker.runActive || (input.backgroundActivityCount ?? 0) > 0
+          ? "idle"
+          : tracker.resting.state,
+    };
   }
   if (session.status === "error") {
     return withMessage("error", lifecycleErrorMessage(session));
   }
 
-  let blocking: ProgramStatusDialog | undefined;
-  for (const dialog of input.pending) {
-    if (isPendingUserReplyRequest(dialog)) blocking = dialog;
-  }
+  const blocking = blockingDialog(input.pending);
   if (blocking) {
     const { kind, message } = blockedFromDialog(blocking);
     return { ...withMessage("blocked", message), kind };
@@ -230,6 +292,14 @@ function deriveBody(input: {
     (session.status === "stopping" &&
       (session.currentTurnStartedAt !== undefined || tracker.runActive));
   if (working) return withMessage("working", oneLine(session.name));
+
+  const count = input.backgroundActivityCount ?? 0;
+  if (count > 0) {
+    return {
+      state: "working",
+      message: `Waiting on ${count} background ${count === 1 ? "activity" : "activities"}`,
+    };
+  }
 
   // A run the lifecycle already calls settled but whose `agent_settled` we never saw (a mirrored
   // TUI that reported idle first) ends with its own result, not the previous run's.
@@ -252,10 +322,12 @@ export function programRunFor(host: ProgramStatusHost): ProgramRunTracker {
 export function syncProgramStatus(host: ProgramStatusHost, now = Date.now()): ProgramStatusSync {
   const { session } = host;
   const previous = session.programStatus;
+  const pending = [...(host.pendingUIRequests?.values() ?? [])];
   const current = deriveProgramStatus({
     session,
     tracker: programRunFor(host),
-    pending: host.pendingUIRequests?.values() ?? [],
+    backgroundActivityCount: host.backgroundActivityCount,
+    pending,
     now,
   });
   const changed =
@@ -266,5 +338,7 @@ export function syncProgramStatus(host: ProgramStatusHost, now = Date.now()): Pr
   if (changed || previous?.since !== current.since) {
     session.programStatus = current;
   }
-  return { previous, current, changed };
+  const blocking = current.state === "blocked" ? blockingDialog(pending) : undefined;
+  const blockedDetail = blocking ? questionDetail(blocking) : undefined;
+  return { previous, current, changed, ...(blockedDetail ? { blockedDetail } : {}) };
 }

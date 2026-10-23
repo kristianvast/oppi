@@ -1,8 +1,8 @@
 import type { ServerResponse } from "node:http";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { RouteContext, RouteDispatcher, RouteHelpers } from "./types.js";
 import { convertPiTheme } from "./theme-convert.js";
 
@@ -19,7 +19,7 @@ export function createThemeRoutes(ctx: RouteContext, helpers: RouteHelpers): Rou
   }
 
   function piThemesDir(): string {
-    return join(homedir(), ".pi", "agent", "themes");
+    return join(getAgentDir(), "themes");
   }
 
   type ThemeSource = "bundled" | "user" | "pi";

@@ -127,7 +127,7 @@ function workspaceDefinitionFromFlags(
   options: { requireFields?: boolean } = {},
 ): Record<string, unknown> {
   const removedDefaultModelError =
-    "Workspace default models are no longer supported; remove --default-model/defaultModel and configure Pi's defaultProvider and defaultModel in ~/.pi/agent/settings.json.";
+    "Workspace default models are no longer supported; remove --default-model/defaultModel and configure Pi's defaultProvider and defaultModel in the Pi agent dir settings.json (default ~/.pi/agent, or PI_CODING_AGENT_DIR).";
   if (Object.hasOwn(flags, "default-model")) {
     throw new Error(removedDefaultModelError);
   }

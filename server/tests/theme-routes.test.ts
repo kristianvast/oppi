@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createRouteHelpers } from "../src/routes/http.js";
 import { createThemeRoutes } from "../src/routes/themes.js";
@@ -9,6 +9,45 @@ import type { RouteContext } from "../src/routes/types.js";
 import { makeRequest, makeResponse } from "./harness/route-test-helpers.js";
 
 describe("themes module", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("lists pi themes from <PI_CODING_AGENT_DIR>/themes", async () => {
+    const root = mkdtempSync(join(tmpdir(), "oppi-theme-agentdir-"));
+    try {
+      const agentDir = join(root, "agent");
+      mkdirSync(join(agentDir, "themes"), { recursive: true });
+      writeFileSync(
+        join(agentDir, "themes", "omo-probe.json"),
+        JSON.stringify({ name: "Omo Probe", vars: { bg: "#101010" }, colors: {} }),
+      );
+      vi.stubEnv("PI_CODING_AGENT_DIR", agentDir);
+      const ctx = { storage: { getDataDir: () => join(root, "data") } } as unknown as RouteContext;
+      const dispatch = createThemeRoutes(ctx, createRouteHelpers());
+      const res = makeResponse();
+
+      await dispatch({
+        method: "GET",
+        path: "/themes",
+        url: new URL("http://localhost/themes"),
+        req: {} as never,
+        res: res as never,
+      });
+
+      const { themes } = JSON.parse(res.body) as {
+        themes: { filename: string; source: string; path: string }[];
+      };
+      const probe = themes.find((theme) => theme.filename === "omo-probe");
+      expect(probe).toMatchObject({
+        source: "pi",
+        path: join(agentDir, "themes", "omo-probe.json"),
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("returns 404 for nonexistent theme", async () => {
     const ctx = {
       storage: {

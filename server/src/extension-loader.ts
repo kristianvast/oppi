@@ -10,14 +10,18 @@ import { basename, dirname, extname, join, resolve } from "node:path";
 
 import {
   DefaultPackageManager,
+  getAgentDir,
   SettingsManager,
   type ResolvedResource,
 } from "@earendil-works/pi-coding-agent";
 
 import { isManagedExtensionName } from "../extensions/built-ins.js";
 
-const DEFAULT_AGENT_DIR = join(homedir(), ".pi", "agent");
-const HOST_EXTENSIONS_DIR = join(DEFAULT_AGENT_DIR, "extensions");
+// Resolved per call: getAgentDir() honors PI_CODING_AGENT_DIR, which the server can
+// receive from config.runtimeEnv after this module loads.
+function hostExtensionsDir(): string {
+  return join(getAgentDir(), "extensions");
+}
 
 const EXTENSION_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/;
 
@@ -186,7 +190,7 @@ export function extensionNameForAllowlist(
 /**
  * List host extensions available for workspace selection.
  *
- * Scans the global host directory (`~/.pi/agent/extensions`) and, when `cwd`
+ * Scans the global host directory (`<agentDir>/extensions`) and, when `cwd`
  * is provided, the project-local directory (`<cwd>/.pi/extensions`). Oppi
  * entries with invalid extension names are excluded.
  *
@@ -197,7 +201,7 @@ export function listHostExtensions(options: ListHostExtensionsOptions = {}): Hos
   const byName = new Map<string, HostExtensionInfo>();
   const dirs = [
     getProjectExtensionsDir(options.cwd),
-    options.globalDir ?? HOST_EXTENSIONS_DIR,
+    options.globalDir ?? hostExtensionsDir(),
   ].filter((dir): dir is string => Boolean(dir));
 
   for (const dir of dirs) {
@@ -253,7 +257,7 @@ async function resolveConfiguredHostExtensionResources(
   options: ListConfiguredHostExtensionsOptions,
 ): Promise<ResolvedResource[]> {
   const cwd = resolveWorkspaceCwd(options.cwd, homedir()) ?? homedir();
-  const agentDir = options.agentDir ?? DEFAULT_AGENT_DIR;
+  const agentDir = options.agentDir ?? getAgentDir();
 
   const settingsManager = SettingsManager.create(cwd, agentDir, {
     projectTrusted: options.projectTrusted ?? true,
@@ -445,11 +449,12 @@ function resolveWorkspaceCwd(cwd: string | undefined, fallback?: string): string
 
 function resolveByName(name: string): ResolvedExtension | null {
   const normalized = normalizeName(name);
+  const extensionsDir = hostExtensionsDir();
   const candidates = uniqueCandidates([
-    join(HOST_EXTENSIONS_DIR, name),
-    join(HOST_EXTENSIONS_DIR, normalized),
-    join(HOST_EXTENSIONS_DIR, `${normalized}.ts`),
-    join(HOST_EXTENSIONS_DIR, `${normalized}.js`),
+    join(extensionsDir, name),
+    join(extensionsDir, normalized),
+    join(extensionsDir, `${normalized}.ts`),
+    join(extensionsDir, `${normalized}.js`),
   ]);
 
   for (const candidate of candidates) {

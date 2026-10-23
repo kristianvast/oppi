@@ -7,16 +7,16 @@
  *
  * Sources (load order, later overrides earlier):
  * 1. Built-in renderers (bash, read, edit, write, grep, find, ls, todo)
- * 2. User renderers (~/.pi/agent/mobile-renderers/*.ts)
+ * 2. User renderers (<agent dir>/mobile-renderers/*.ts)
  *
  * User renderers live in a dedicated directory separate from pi extensions
  * so the pi CLI doesn't try to load them as extensions.
  */
 
 import { existsSync, readdirSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { createLogger } from "./logger.js";
 import type {
   StyledSegment,
@@ -171,7 +171,9 @@ export class MobileRendererRegistry {
   }
 
   /** Default directory for user-provided mobile renderers. */
-  static readonly RENDERERS_DIR = join(homedir(), ".pi", "agent", "mobile-renderers");
+  static rendererDir(): string {
+    return join(getAgentDir(), "mobile-renderers");
+  }
 
   /**
    * Discover renderer files in the mobile-renderers directory.
@@ -179,7 +181,7 @@ export class MobileRendererRegistry {
    * Every .ts/.js file in the directory is treated as a renderer module.
    * Returns absolute paths to discovered files.
    */
-  static discoverRenderers(renderersDir: string = MobileRendererRegistry.RENDERERS_DIR): string[] {
+  static discoverRenderers(renderersDir: string = MobileRendererRegistry.rendererDir()): string[] {
     if (!existsSync(renderersDir)) return [];
 
     const files: string[] = [];

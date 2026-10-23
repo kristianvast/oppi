@@ -22,7 +22,7 @@ import type {
   WorkspaceWorktreePreviewFile,
 } from "./types.js";
 
-const MAIN_WORKTREE_ID = "main";
+export const MAIN_WORKTREE_ID = "main";
 const PROJECT_WORKTREES_DIR = ".pi/worktrees";
 const DATA_DIR_WORKTREES_DIR = "worktrees";
 

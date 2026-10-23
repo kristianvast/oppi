@@ -394,6 +394,11 @@ export class SessionInputCoordinator {
     }
 
     if (!this.isRuntimeBusy(active)) {
+      // Shown as working while the agent only waits on background work: clients offer
+      // steer/follow-up, but no turn is streaming, so this input starts the next turn.
+      if (active.session.programStatus?.state === "working") {
+        return this.sendPromptAdmitted(key, active, message, opts, permit);
+      }
       throw new Error(streamingInputBusyErrorMessage(active.session, kind));
     }
 

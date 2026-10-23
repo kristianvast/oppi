@@ -5,6 +5,7 @@ import {
   requiredModelLaunchFailureMessage,
 } from "../agent-launch-service.js";
 import { SessionLifecycleError, SessionLifecycleService } from "../session-lifecycle-service.js";
+import { HerdrLauncher } from "../herdr-launcher.js";
 import {
   type ChatAttachmentRef,
   type ControlSessionDomain,
@@ -96,12 +97,14 @@ function invalidDelegationFields(
 }
 
 export function createSessionRoutes(ctx: RouteContext, helpers: RouteHelpers): RouteDispatcher {
+  const terminalLauncher = new HerdrLauncher(ctx.storage, ctx.sessionRuntimes);
   const lifecycle = new SessionLifecycleService({
     storage: ctx.storage,
     sessions: ctx.sessions,
     sessionRuntimes: ctx.sessionRuntimes,
     ensureSessionContextWindow: ctx.ensureSessionContextWindow,
     deleteSearchIndexSession: (sessionId) => ctx.searchIndex?.deleteSession(sessionId),
+    createTerminalSession: (params) => terminalLauncher.createSession(params),
   });
   const commandHandler = new WsMessageHandler({
     sessions: ctx.sessionRuntimes,

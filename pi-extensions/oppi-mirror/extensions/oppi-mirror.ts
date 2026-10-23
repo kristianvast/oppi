@@ -2045,6 +2045,11 @@ function editableAgentSessionForContext(
   );
 }
 
+const backgroundActivitySources = new WeakMap<
+  ExtensionAPI,
+  Map<string, number>
+>();
+
 function stateSnapshot(pi: ExtensionAPI, ctx: ExtensionContext) {
   const session = editableAgentSessionForContext(ctx);
   const cacheReadCostPerMillion = ctx.model?.cost.cacheRead;
@@ -2057,6 +2062,9 @@ function stateSnapshot(pi: ExtensionAPI, ctx: ExtensionContext) {
     model: modelWire(ctx),
     thinkingLevel: pi.getThinkingLevel(),
     isIdle: ctx.isIdle(),
+    backgroundActivityCount: [
+      ...(backgroundActivitySources.get(pi)?.values() ?? []),
+    ].reduce((total, count) => total + count, 0),
     contextUsage: contextUsageWire(ctx),
     showCacheMissNotices:
       session?.settingsManager?.getShowCacheMissNotices?.() ?? false,
@@ -2792,6 +2800,7 @@ function createMirrorCallerSessionIdentity(): MirrorCallerSessionIdentity {
 
 interface TuiMirrorRuntime {
   startSession(ctx: ExtensionContext): void;
+  publishBackgroundActivity(): void;
 }
 
 interface MirrorInputPreflightRecord {
@@ -2802,6 +2811,7 @@ interface MirrorInputPreflightRecord {
 
 async function createTuiMirrorRuntime(
   pi: ExtensionAPI,
+  onShutdown: () => void,
 ): Promise<TuiMirrorRuntime> {
   let latestCtx: ExtensionContext | null = null;
   let ws: WebSocket | null = null;
@@ -5234,6 +5244,7 @@ async function createTuiMirrorRuntime(
           canonicalFlush.discard();
         }
         runtimeActive = false;
+        onShutdown();
         queueUpdateBridge.listeners.delete(queueUpdateListener);
         queueUpdateBridge.internalEventListeners.delete(
           internalAgentEventListener,
@@ -5325,16 +5336,40 @@ async function createTuiMirrorRuntime(
     },
   });
 
-  return { startSession };
+  return {
+    startSession,
+    publishBackgroundActivity() {
+      if (!runtimeActive || !latestCtx) return;
+      const state = safeStateSnapshot(pi, latestCtx);
+      if (state) send({ type: "state", state });
+    },
+  };
 }
 
 export default async function oppiPiMirror(pi: ExtensionAPI): Promise<void> {
   let runtimePromise: Promise<TuiMirrorRuntime> | undefined;
-
+  let runtime: TuiMirrorRuntime | undefined;
+  const sources = new Map<string, number>();
+  backgroundActivitySources.set(pi, sources);
+  // Subscribe before session_start: producers publish their initial full snapshots there.
+  // This is a semantic liveness contract, not a tool/status/widget-name convention.
+  const unsubscribe = pi.events.on("wake_source_state", (data: unknown) => {
+    if (
+      !isRecord(data) ||
+      typeof data.source !== "string" ||
+      typeof data.activeCount !== "number" ||
+      !Number.isSafeInteger(data.activeCount) ||
+      data.activeCount < 0
+    )
+      return;
+    if (sources.get(data.source) === data.activeCount) return;
+    sources.set(data.source, data.activeCount);
+    runtime?.publishBackgroundActivity();
+  });
   pi.on("session_start", async (_event, ctx) => {
     if (ctx.mode !== "tui") return;
-    runtimePromise ??= createTuiMirrorRuntime(pi);
-    const runtime = await runtimePromise;
+    runtimePromise ??= createTuiMirrorRuntime(pi, unsubscribe);
+    runtime = await runtimePromise;
     runtime.startSession(ctx);
   });
 }

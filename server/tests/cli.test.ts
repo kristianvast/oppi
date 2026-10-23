@@ -2263,7 +2263,7 @@ describe("oppi local API commands", () => {
           ok: false,
           error: {
             message:
-              "Workspace default models are no longer supported; remove --default-model/defaultModel and configure Pi's defaultProvider and defaultModel in ~/.pi/agent/settings.json.",
+              "Workspace default models are no longer supported; remove --default-model/defaultModel and configure Pi's defaultProvider and defaultModel in the Pi agent dir settings.json (default ~/.pi/agent, or PI_CODING_AGENT_DIR).",
           },
         });
         expect(requests, args.join(" ")).toHaveLength(before);

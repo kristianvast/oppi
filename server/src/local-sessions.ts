@@ -1,7 +1,7 @@
 /**
  * Local pi session discovery.
  *
- * Scans ~/.pi/agent/sessions/ to find sessions started from TUI pi
+ * Scans <agent dir>/sessions/ (default ~/.pi/agent/sessions/) to find sessions started from TUI pi
  * that aren't managed by the oppi server. These can be imported into
  * a workspace for mobile resume.
  *
@@ -21,6 +21,7 @@ import {
 import { stat, readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { homedir } from "node:os";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import {
   DEFAULT_SESSION_JSONL_META_READ_BYTES,
   readSessionJsonlMeta,
@@ -29,19 +30,17 @@ import { openDatabase, type SqliteDatabase } from "./sqlite-compat.js";
 import { runSessionStateDeadSchemaCleanup } from "./storage/session-state-cleanup-migration.js";
 import type { LocalSession, Session } from "./types.js";
 
-/** Default root of pi agent sessions when OPPI_LOCAL_SESSIONS_ROOT is unset. */
-const DEFAULT_PI_SESSIONS_ROOT = join(homedir(), ".pi", "agent", "sessions");
-
 /**
  * Resolve the configured pi sessions root.
  *
- * Read on each call so tests can point OPPI_LOCAL_SESSIONS_ROOT at a temp tree
+ * Defaults to <agent dir>/sessions (getAgentDir honors PI_CODING_AGENT_DIR, so
+ * omo sessions under ~/.omo/agent are visible). Read on each call so tests can point OPPI_LOCAL_SESSIONS_ROOT at a temp tree
  * without relying on module-load timing. Production servers typically set the
  * env once at process start (or leave the home default).
  */
 function resolvePiSessionsRoot(): string {
   const override = process.env.OPPI_LOCAL_SESSIONS_ROOT?.trim();
-  return override && override.length > 0 ? override : DEFAULT_PI_SESSIONS_ROOT;
+  return override && override.length > 0 ? override : join(getAgentDir(), "sessions");
 }
 
 /**
@@ -89,7 +88,7 @@ export function validateLocalSessionPath(filePath: string): { path: string } | {
 
   // Must be under pi sessions root
   if (!realPath.startsWith(realRoot + "/") && realPath !== realRoot) {
-    return { error: "Path must be under ~/.pi/agent/sessions/" };
+    return { error: "Path must be under the pi agent sessions directory" };
   }
 
   // Validate JSONL header

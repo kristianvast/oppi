@@ -19,7 +19,7 @@ import { generateId } from "../id.js";
 import { DEFAULT_ICON_CHOICE, migrateIconChoice, validateIconChoice } from "../icon-choice.js";
 import { createLogger } from "../logger.js";
 import { safeErrorMessage } from "../log-utils.js";
-import { hostFolderClaimsHome, resolveHostPath } from "../host.js";
+import { hostFolderClaimsHome, hostFolderIsHome, resolveHostPath } from "../host.js";
 import { ensureOwnerOnlyRealDirectory } from "../owner-directory.js";
 import type {
   CreateWorkspaceRequest,
@@ -135,11 +135,25 @@ export class WorkspaceStore {
     return join(this.configStore.getWorkspacesDir(), `${workspaceId}.json`);
   }
 
-  createWorkspace(req: CreateWorkspaceRequest): Workspace {
+  /**
+   * `allowHomeFolder` admits a host workspace rooted exactly at home (never above it). Only the
+   * terminal mirror sets it, for its Home workspace; cwd matchers let such a workspace claim the
+   * home folder alone, never the folders under it.
+   */
+  createWorkspace(
+    req: CreateWorkspaceRequest,
+    options: { allowHomeFolder?: boolean } = {},
+  ): Workspace {
     const id = generateId(8);
     const now = Date.now();
     const runtime = req.runtime === "sandbox" ? "sandbox" : "host";
-    assertHostFolderDoesNotClaimHome(normalizeHostMount(req.hostMount));
+    const requestedHostMount = normalizeHostMount(req.hostMount);
+    const homeAllowed =
+      options.allowHomeFolder === true &&
+      runtime === "host" &&
+      requestedHostMount !== undefined &&
+      hostFolderIsHome(requestedHostMount);
+    if (!homeAllowed) assertHostFolderDoesNotClaimHome(requestedHostMount);
     const folder = this.chooseHostMount(req.hostMount, { id, name: req.name, runtime });
 
     const workspace: Workspace = {

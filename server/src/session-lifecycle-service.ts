@@ -193,6 +193,9 @@ export interface SessionLifecycleServiceDeps {
   >;
   ensureSessionContextWindow: (session: Session) => Session;
   deleteSearchIndexSession?: (sessionId: string) => void;
+  createTerminalSession?: (
+    params: Parameters<SessionLifecycleService["createWorkspaceSession"]>[0],
+  ) => Promise<CreateWorkspaceSessionResult | undefined>;
 }
 
 /**
@@ -224,6 +227,8 @@ export class SessionLifecycleService {
     autoStop?: boolean;
     engine?: SessionEngine;
   }): Promise<CreateWorkspaceSessionResult> {
+    const terminal = await this.deps.createTerminalSession?.(params);
+    if (terminal) return terminal;
     const inlineAgent: AgentDefinition = {
       name: params.name?.trim() || params.workspace.name || "Workspace session",
       sessionDefaults: {

@@ -13,6 +13,7 @@ import { closeSync, existsSync, openSync, readSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { createLogger } from "./logger.js";
+import { hostFolderIsHome } from "./host.js";
 import { AgentDefinitionStore } from "./agent-definitions.js";
 import { iconAssetId } from "./icon-choice.js";
 import { AgentScheduleStore } from "./agent-schedules.js";
@@ -73,6 +74,11 @@ function pathContains(parent: string, child: string): boolean {
   const resolvedParent = normalizedPath(parent);
   const resolvedChild = normalizedPath(child);
   return resolvedChild === resolvedParent || resolvedChild.startsWith(resolvedParent + "/");
+}
+
+/** A workspace rooted at home claims the home folder only, never the folders under it. */
+function workspaceClaimsCwd(hostMount: string, cwd: string): boolean {
+  return hostFolderIsHome(hostMount) ? hostFolderIsHome(cwd) : pathContains(hostMount, cwd);
 }
 
 function readJsonlSessionCwd(filePath: string | undefined): string | null {
@@ -167,7 +173,7 @@ export class Storage {
       if (!cwd) continue;
 
       const candidates = workspaces
-        .filter((candidate) => pathContains(candidate.hostMount, cwd))
+        .filter((candidate) => workspaceClaimsCwd(candidate.hostMount, cwd))
         .sort((a, b) => normalizedPath(b.hostMount).length - normalizedPath(a.hostMount).length);
       const workspace = candidates[0];
       const workspaceMountLength = workspace ? normalizedPath(workspace.hostMount).length : 0;
@@ -532,9 +538,9 @@ export class Storage {
 
   // ─── Workspaces ───
 
-  createWorkspace(req: CreateWorkspaceRequest): Workspace {
+  createWorkspace(req: CreateWorkspaceRequest, options?: { allowHomeFolder?: boolean }): Workspace {
     this.workspaceNames = undefined;
-    return this.workspaceStore.createWorkspace(req);
+    return this.workspaceStore.createWorkspace(req, options);
   }
 
   saveWorkspace(workspace: Workspace): void {

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { EventEmitter } from "node:events";
 import {
   existsSync,
   mkdirSync,
@@ -179,6 +180,10 @@ type Handler = (
 ) => unknown;
 
 interface MockPi {
+  events: {
+    on(name: string, handler: (data: unknown) => void): () => void;
+    emit(name: string, data: unknown): void;
+  };
   handlers: Map<string, Handler[]>;
   commands: Map<
     string,
@@ -230,6 +235,7 @@ interface MockExtensionContext {
 }
 
 function createMockPi(): MockPi {
+  const events = new EventEmitter();
   const handlers = new Map<string, Handler[]>();
   const commands = new Map<
     string,
@@ -237,6 +243,17 @@ function createMockPi(): MockPi {
   >();
   let thinkingLevel = "medium";
   return {
+    events: {
+      on(name, handler) {
+        events.on(name, handler);
+        return () => {
+          events.off(name, handler);
+        };
+      },
+      emit(name, data) {
+        events.emit(name, data);
+      },
+    },
     handlers,
     commands,
     on(event: string, handler: Handler) {
@@ -574,6 +591,52 @@ describe("oppi mirror input preflight", () => {
       expect(sentCommandResults(socket, "attached-prompt")).toEqual([
         expect.objectContaining({ success: true }),
       ]);
+    });
+  });
+
+  it("forwards initial and changing generic wake-source counts without a parent turn", async () => {
+    await withInteractiveTerminal(async () => {
+      vi.stubEnv("OPPI_MIRROR_URL", "http://127.0.0.1:1234");
+      vi.stubEnv("OPPI_MIRROR_TOKEN", "test-token");
+      vi.stubEnv("OPPI_MIRROR_AUTO_START", "false");
+      const pi = createMockPi();
+      await oppiPiMirror(pi as never);
+      pi.events.emit("wake_source_state", {
+        source: "children",
+        activeCount: 3,
+      });
+      const ctx = createMockContext();
+      await startSession(pi, ctx);
+      const socket = await startMirror(pi, ctx);
+      const hello = JSON.parse(socket.sent[0]);
+      expect(hello.state.backgroundActivityCount).toBe(3);
+      socket.sent.length = 0;
+
+      for (const [source, activeCount] of [
+        ["children", 2],
+        ["other-runtime-work", 1],
+        ["children", 0],
+        ["other-runtime-work", 0],
+        ["other-runtime-work", 0],
+        ["invalid", -1],
+        ["invalid", 0.5],
+        ["invalid", "4"],
+      ]) {
+        pi.events.emit("wake_source_state", { source, activeCount });
+      }
+
+      expect(
+        socket.sent.map(
+          (line) => JSON.parse(line).state.backgroundActivityCount,
+        ),
+      ).toEqual([2, 3, 1, 0]);
+      await shutdownSession(pi, ctx, "quit");
+      const sentBefore = socket.sent.length;
+      pi.events.emit("wake_source_state", {
+        source: "children",
+        activeCount: 7,
+      });
+      expect(socket.sent).toHaveLength(sentBefore);
     });
   });
 

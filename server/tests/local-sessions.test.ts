@@ -2,7 +2,7 @@
  * Tests for local pi session discovery and validation.
  */
 
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mkdirSync, writeFileSync, rmSync, mkdtempSync, utimesSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir, homedir } from "node:os";
@@ -145,10 +145,23 @@ describe("pi sessions root resolution", () => {
   const previousRoot = process.env.OPPI_LOCAL_SESSIONS_ROOT;
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     if (previousRoot === undefined) {
       delete process.env.OPPI_LOCAL_SESSIONS_ROOT;
     } else {
       process.env.OPPI_LOCAL_SESSIONS_ROOT = previousRoot;
+    }
+  });
+
+  it("defaults to <PI_CODING_AGENT_DIR>/sessions at call time", () => {
+    const agentDir = mkdtempSync(join(tmpdir(), "oppi-local-sessions-agentdir-"));
+    try {
+      mkdirSync(join(agentDir, "sessions"));
+      delete process.env.OPPI_LOCAL_SESSIONS_ROOT;
+      vi.stubEnv("PI_CODING_AGENT_DIR", agentDir);
+      expect(realpathSync(getPiSessionsRoot())).toBe(realpathSync(join(agentDir, "sessions")));
+    } finally {
+      rmSync(agentDir, { recursive: true, force: true });
     }
   });
 
@@ -213,7 +226,7 @@ describe("validateLocalSessionPath", () => {
     try {
       const result = validateLocalSessionPath(tmpFile);
       expect(result).toHaveProperty("error");
-      expect((result as { error: string }).error).toContain("~/.pi/agent/sessions/");
+      expect((result as { error: string }).error).toContain("pi agent sessions directory");
     } finally {
       rmSync(tmpFile, { force: true });
     }

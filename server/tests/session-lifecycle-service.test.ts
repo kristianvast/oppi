@@ -119,6 +119,7 @@ function makeService(
     onStartSession?: () => void;
     saveSessionErrorAtCall?: number;
     sendPromptHandler?: () => Promise<void>;
+    createTerminalSession?: SessionLifecycleServiceDeps["createTerminalSession"];
   } = {},
 ): {
   service: SessionLifecycleService;
@@ -258,6 +259,7 @@ function makeService(
       contextWindow: session.contextWindow ?? 200_000,
     }),
     deleteSearchIndexSession,
+    createTerminalSession: options.createTerminalSession,
   };
 
   return {
@@ -288,6 +290,25 @@ function makeService(
 
 describe("SessionLifecycleService", () => {
   describe("createWorkspaceSession", () => {
+    it("returns a launched terminal without creating a managed session", async () => {
+      const session = makeSession({ runtime: "pi-tui" });
+      const createTerminalSession = vi.fn(async () => ({ session, createdSession: session }));
+      const { service, createSession, startSession } = makeService({ createTerminalSession });
+      const params = { workspace: makeWorkspace(), prompt: "first" };
+      expect(await service.createWorkspaceSession(params)).toMatchObject({ session });
+      expect(createTerminalSession).toHaveBeenCalledWith(params);
+      expect(createSession).not.toHaveBeenCalled();
+      expect(startSession).not.toHaveBeenCalled();
+    });
+
+    it("uses normal managed creation when the terminal launcher declines", async () => {
+      const createTerminalSession = vi.fn(async () => undefined);
+      const { service, createSession } = makeService({ createTerminalSession });
+      await service.createWorkspaceSession({ workspace: makeWorkspace() });
+      expect(createTerminalSession).toHaveBeenCalledOnce();
+      expect(createSession).toHaveBeenCalledOnce();
+    });
+
     it("creates promptless managed sessions with Pi defaults and explicit thinking state", async () => {
       const createdSession = makeSession({ id: "created-1" });
       const { service, createSession, saveSession, startSession, sendPrompt } = makeService({

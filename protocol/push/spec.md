@@ -112,8 +112,8 @@ bytes `[0, 577)`. The signature covers the version, `kid`, `enc`, and `ct`.
 | `workspaceId` | Present when the session has a workspace |
 | `approvalId` | `pairing_approval` only: the pending approval (`pa_...`) |
 | `deviceId` | `device_enrolled` only: the newly paired device |
-| `title`, `body` | Display text |
-| `subtitle` | Session name; the server shortens it until the JSON fits 510 bytes, and drops it when nothing else fits |
+| `title`, `body` | Display text. Session titles may end with ` · <workspace name>`; a `blocked` body may carry the question or approval request and a `done` body the start of the agent's last message |
+| `subtitle` | Session name, or the first prompt's opening when the session has none; the server shortens it until the JSON fits 510 bytes, and drops it when nothing else fits |
 
 Pairing pushes carry no session:
 
@@ -193,6 +193,9 @@ plaintext.
 | `ended` | Session Ended | The session ended. |
 | `pairing_approval` | Approve New Device? | A new device is waiting for your approval. |
 | `device_enrolled` | New Device Paired | A new device was paired with your server. |
+
+The fixed bodies are for redaction. A server sends no session push that would carry only a
+fixed body and no session subtitle, since that alert cannot say what it is about.
 
 The pairing rows apply under App Lock or a server-scope lock; they have no workspace or
 session, so narrower scoped locks do not cover them.

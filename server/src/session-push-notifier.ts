@@ -3,6 +3,7 @@ import { createLogger } from "./logger.js";
 import type { PushNotification, PushSender } from "./push/push-sender.js";
 import type { ProgramStatusSync } from "./program-status.js";
 import type { SessionBroadcastEvent } from "./session-broadcast.js";
+import { sessionEndIsTerminalOwned } from "./session-runtime-capabilities.js";
 import type { Storage } from "./storage.js";
 import type { ProgramStatusKind, Session, SessionPushEvent } from "./types.js";
 
@@ -11,6 +12,17 @@ const GENERIC_SESSION_ERROR_REASON = "Open Oppi to review the session error.";
 
 /** Shortest gap between two pushes of the same kind for one session. */
 const PROGRAM_STATUS_PUSH_MIN_INTERVAL_MS = 60_000;
+
+/** Longest workspace label in a title, and longest detail line in a body (code points). */
+const TITLE_WORKSPACE_MAX = 30;
+const BODY_DETAIL_MAX = 240;
+
+function clip(value: string | undefined, max: number): string | undefined {
+  const line = value?.replace(/\s+/g, " ").trim();
+  if (!line) return undefined;
+  const points = Array.from(line);
+  return points.length <= max ? line : `${points.slice(0, max - 1).join("")}…`;
+}
 
 const BLOCKED_PRESENTATION = {
   permission: { title: "Needs Approval", body: "Waiting for your approval." },
@@ -23,6 +35,8 @@ type PushEventContent = {
   kind?: ProgramStatusKind;
   title: string;
   body: string;
+  /** The body says something specific to this event, not the fixed fallback text. */
+  detailed: boolean;
 };
 
 export interface SessionPushNotifierOptions {
@@ -58,7 +72,11 @@ export class SessionPushNotifier {
     if (!content) {
       return;
     }
-    this.deliver(payload.sessionId, content, { skipPresent: false });
+    this.deliver(payload.sessionId, content, {
+      skipPresent: false,
+      // Closing or reloading a mirrored terminal is the user's own action at the Mac.
+      skipMirroredTerminal: content.event === "ended",
+    });
   }
 
   /** Push on entering `blocked` or `done`. Same-state updates (message, kind) never push. */
@@ -73,7 +91,9 @@ export class SessionPushNotifier {
     const last = this.lastProgramPushAt.get(throttleKey);
     if (last !== undefined && now - last < PROGRAM_STATUS_PUSH_MIN_INTERVAL_MS) return;
 
-    if (this.deliver(session.id, this.programStatusContent(current), { skipPresent: true })) {
+    if (
+      this.deliver(session.id, this.programStatusContent(change, session), { skipPresent: true })
+    ) {
       // Entries older than the interval no longer throttle anything; keep the map bounded.
       for (const [key, at] of this.lastProgramPushAt) {
         if (now - at >= PROGRAM_STATUS_PUSH_MIN_INTERVAL_MS) this.lastProgramPushAt.delete(key);
@@ -82,19 +102,41 @@ export class SessionPushNotifier {
     }
   }
 
-  private programStatusContent(current: ProgramStatusSync["current"]): PushEventContent {
+  /**
+   * Bodies carry what the user needs to act: the question with its choices, the approval
+   * request from program status, or the first part of the agent's last message. Pushes are end-to-end encrypted
+   * (protocol/push/spec.md), and the phone swaps in the fixed text while App Lock or a scoped
+   * lock covers the session.
+   */
+  private programStatusContent(change: ProgramStatusSync, session: Session): PushEventContent {
+    const { current } = change;
     if (current.state === "blocked") {
       const kind = current.kind ?? "question";
-      return { event: "blocked", kind, ...BLOCKED_PRESENTATION[kind] };
+      const fixed = BLOCKED_PRESENTATION[kind];
+      const detail =
+        clip(change.blockedDetail, BODY_DETAIL_MAX) ?? clip(current.message, BODY_DETAIL_MAX);
+      return {
+        event: "blocked",
+        kind,
+        title: fixed.title,
+        body: detail ?? fixed.body,
+        detailed: detail !== undefined,
+      };
     }
-    return { event: "done", title: "Session Done", body: "The run finished." };
+    const detail = clip(session.lastMessage, BODY_DETAIL_MAX);
+    return {
+      event: "done",
+      title: "Session Done",
+      body: detail ?? "The run finished.",
+      detailed: detail !== undefined,
+    };
   }
 
   /** Returns whether a push was attempted (some registered device was not skipped). */
   private deliver(
     sessionId: string,
     content: PushEventContent,
-    options: { skipPresent: boolean },
+    options: { skipPresent: boolean; skipMirroredTerminal?: boolean },
   ): boolean {
     const registrations = this.push
       .registrations()
@@ -104,13 +146,33 @@ export class SessionPushNotifier {
     }
 
     const session = this.storage.getSession(sessionId);
+    if (options.skipMirroredTerminal && session && sessionEndIsTerminalOwned(session)) return false;
+    const workspaceName = session?.workspaceId
+      ? clip(this.storage.getWorkspace(session.workspaceId)?.name, TITLE_WORKSPACE_MAX)
+      : undefined;
+    // A fresh terminal has no name until its title is generated; its first prompt names it.
+    const sessionLabel = clip(session?.name, BODY_DETAIL_MAX) ?? clip(session?.firstMessage, 80);
+    const { detailed, ...text } = content;
+    // Neither which session nor what happened: an anonymous alert says nothing worth a buzz.
+    if (!sessionLabel && !detailed) {
+      log.info("session_push.skipped_anonymous", { sessionId, pushEvent: content.event });
+      return false;
+    }
     const notification: PushNotification = {
-      ...content,
+      ...text,
+      title: workspaceName ? `${content.title} · ${workspaceName}` : content.title,
       sessionId,
       ...(session?.workspaceId ? { workspaceId: session.workspaceId } : {}),
-      ...(session?.name ? { subtitle: session.name } : {}),
+      ...(sessionLabel ? { subtitle: sessionLabel } : {}),
     };
 
+    log.info("session_push.sent", {
+      sessionId,
+      // `event` is the log line's own name in this logger.
+      pushEvent: content.event,
+      ...(content.kind ? { kind: content.kind } : {}),
+      devices: registrations.length,
+    });
     for (const registration of registrations) {
       void this.push.send(registration, notification).catch((err: unknown) => {
         log.warn("session_push.send_failed", {
@@ -132,12 +194,19 @@ export class SessionPushNotifier {
           event: "ended",
           title: "Session Ended",
           body: event.reason || "The session ended.",
+          detailed: Boolean(event.reason),
         };
       case "error":
         if (event.error.startsWith("Retrying (")) {
           return null;
         }
-        return { event: "error", title: "Session Error", body: GENERIC_SESSION_ERROR_REASON };
+        // Error text stays out of pushes, so only the session label can say what this is about.
+        return {
+          event: "error",
+          title: "Session Error",
+          body: GENERIC_SESSION_ERROR_REASON,
+          detailed: false,
+        };
       default:
         return null;
     }

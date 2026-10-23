@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 
 import {
   extensionInstallName,
@@ -14,6 +14,10 @@ import {
   resolveWorkspaceExtensions,
   type ResolvedExtension,
 } from "../src/extension-loader.js";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 // ─── isValidExtensionName ───
 
@@ -133,6 +137,18 @@ describe("resolveWorkspaceExtensions", () => {
     expect(result.warnings.some((w) => w.includes("managed"))).toBe(false);
   });
 
+  it("resolves names from the PI_CODING_AGENT_DIR extensions directory", () => {
+    const agentDir = mkdtempSync(join(tmpdir(), "oppi-agent-dir-"));
+    mkdirSync(join(agentDir, "extensions"), { recursive: true });
+    writeFileSync(join(agentDir, "extensions", "env-ext.ts"), "export default function() {}\n");
+    vi.stubEnv("PI_CODING_AGENT_DIR", agentDir);
+
+    const result = resolveWorkspaceExtensions(["env-ext"]);
+    expect(result.extensions.map((e) => e.path)).toEqual([
+      join(agentDir, "extensions", "env-ext.ts"),
+    ]);
+  });
+
   it("deduplicates repeated names", () => {
     const result = resolveWorkspaceExtensions(["zzz-fake", "zzz-fake"]);
     const notFoundWarnings = result.warnings.filter((w) => w.includes("not found"));
@@ -223,6 +239,18 @@ describe("listConfiguredHostExtensions", () => {
 // ─── listHostExtensions ───
 
 describe("listHostExtensions", () => {
+  it("defaults the global directory to PI_CODING_AGENT_DIR/extensions", () => {
+    const agentDir = mkdtempSync(join(tmpdir(), "oppi-agent-dir-"));
+    mkdirSync(join(agentDir, "extensions"), { recursive: true });
+    writeFileSync(join(agentDir, "extensions", "env-ext.ts"), "export default function() {}\n");
+    vi.stubEnv("PI_CODING_AGENT_DIR", agentDir);
+
+    const extensions = listHostExtensions();
+    expect(extensions.find((e) => e.name === "env-ext")?.path).toBe(
+      join(agentDir, "extensions", "env-ext.ts"),
+    );
+  });
+
   it("returns an array (may be empty in test environments)", () => {
     const extensions = listHostExtensions();
     expect(Array.isArray(extensions)).toBe(true);

@@ -955,7 +955,7 @@ async function cmdInit(flags: Record<string, string>): Promise<void> {
     maxSessionsGlobal = parseInt(flags["max-sessions"] || "200") || 200;
 
     console.log(c.dim(`  Port:         ${port}`));
-    console.log(c.dim("  Model:        Pi settings (~/.pi/agent/settings.json)"));
+    console.log(c.dim("  Model:        Pi settings (<agent dir>/settings.json, default ~/.pi/agent)"));
     console.log(c.dim(`  Max sessions: ${maxSessionsGlobal}`));
     console.log("");
   } else {
@@ -965,7 +965,7 @@ async function cmdInit(flags: Record<string, string>): Promise<void> {
 
     console.log("");
     console.log(c.dim("  Model defaults are read from Pi settings:"));
-    console.log(c.dim("    ~/.pi/agent/settings.json"));
+    console.log(c.dim("    <agent dir>/settings.json (default ~/.pi/agent, or PI_CODING_AGENT_DIR)"));
     console.log(c.dim("    <workspace>/.pi/settings.json"));
     console.log("");
 

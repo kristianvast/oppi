@@ -69,6 +69,11 @@ export function shouldRecordPromptLocally(session: Pick<Session, "runtime">): bo
   return !isPiTuiSession(session);
 }
 
+/** A mirrored terminal ends when the user closes or reloads it at the Mac: no alert needed. */
+export function sessionEndIsTerminalOwned(session: Pick<Session, "runtime">): boolean {
+  return isPiTuiSession(session);
+}
+
 export function promptBusyErrorMessage(session: Pick<Session, "runtime">): string {
   return isPiTuiSession(session)
     ? "Prompt requires an idle terminal session; use steer or follow_up while a turn is streaming"
